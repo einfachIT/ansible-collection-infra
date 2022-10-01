@@ -1,0 +1,32 @@
+---
+- name: Prepare
+  hosts: docker_host
+  become: true
+  vars:
+    docker_expose_api: true
+  roles:
+    - role: einfachit.epic.docker
+
+  tasks:
+    - name: Configure static IP for wired network
+      ansible.builtin.blockinfile:
+        path: /etc/dhcpcd.conf
+        block: |
+          # Set Static IP for wired network interface
+          interface eth0
+          static ip_address={{ ceph_cluster_network_ip }}/24
+      notify:
+        - Reboot server
+        - Wait 600 seconds, but only start checking after 60 seconds
+
+  handlers:
+    - name: Reboot server
+      ansible.builtin.command: reboot
+      async: 100
+      poll: 0
+      changed_when: false
+
+    - name: Wait 600 seconds, but only start checking after 60 seconds
+      ansible.builtin.wait_for_connection:
+        delay: 60
+        timeout: 600

@@ -1,0 +1,21 @@
+---
+
+galaxy_info:
+  role_name: ceph_osd
+  namespace: einfachit
+  author: bassinator
+  description: add host as osd to existing ceph cluster
+  company: einfach IT
+
+  license: GNU GPLv3
+
+  min_ansible_version: "2.4"
+
+  platforms:
+    - name: Debian
+      release:
+        - 'bullseye'
+
+  galaxy_tags: [raspberry]
+
+dependencies: []

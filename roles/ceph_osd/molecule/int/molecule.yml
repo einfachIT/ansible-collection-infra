@@ -1,0 +1,74 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: delegated
+lint: |
+  set -e
+  yamllint .
+  ansible-lint
+platforms:
+  - name: ceph-mon1
+    groups:
+      - ceph_mon
+      - ceph_osd
+      - docker_host
+      - raspberries
+  - name: ceph-shell
+    groups:
+      - container
+  - name: ceph-osd1
+    groups:
+      - ceph_osd
+      - raspberries
+  - name: ceph-osd2
+    groups:
+      - ceph_osd
+      - raspberries
+  - name: ceph-shell
+      - containers
+provisioner:
+  name: ansible
+  # env:
+  #   ANSIBLE_ROLES_PATH: ..
+  inventory:
+    host_vars:
+      ceph-mon1:
+        raw_hostname: '0x55d28e08' # pi4 2GB
+        hostname: ceph
+        ceph_cluster_network_ip: 192.168.10.10
+        ansible_host: "{{ hostname }}.local"
+        ansible_user: pi
+        ansible_ssh_pass: raspberry
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+        ansible_python_interpreter: /usr/bin/python3
+      ceph-osd1:
+        raw_hostname: '0x52e884f2' # pi3
+        hostname: ceph-osd1
+        ceph_cluster_network_ip: 192.168.10.11
+      ceph-osd2:
+        raw_hostname: '0x0031ce19' # pi3
+        hostname: ceph-osd2
+        ceph_cluster_network_ip: 192.168.10.12
+      ceph-shell:
+        ansible_connection: docker
+        ansible_docker_extra_args: "-H=tcp://ceph-mon1.local:2375"
+        remote_tmp: /tmp/.ansible
+        ansible_user: root
+    group_vars:
+      raspberries:
+        ansible_host: "{{ hostname }}.local"
+        ansible_user: pi
+        ansible_ssh_pass: raspberry
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+        ansible_python_interpreter: /usr/bin/python3
+      osds:
+        ceph_ods_devices:
+          - /dev/sda
+          - /dev/sdb
+scenario:
+  name: int
+  converge_sequence:
+    - converge
+verifier:
+  name: ansible

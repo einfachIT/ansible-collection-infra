@@ -1,0 +1,48 @@
+---
+dependency:
+  name: galaxy
+prerun: false
+driver:
+  name: delegated
+lint: |
+  set -e
+  yamllint .
+  ansible-lint
+platforms:
+  - name: ceph-mon1
+    groups:
+      - raspberries
+      - ceph_mon
+      - ceph_osd
+      - docker_host
+  - name: ceph-shell
+    groups:
+      - containers
+provisioner:
+  name: ansible
+  inventory:
+    host_vars:
+      ceph-mon1:
+        raw_hostname: '0x55d28e08'
+        hostname: ceph-mon1
+        ansible_host: "{{ hostname }}.local"
+        ansible_user: pi
+        ansible_ssh_pass: raspberry
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+        ansible_python_interpreter: /usr/bin/python3
+        ceph_cluster_network: 192.168.10.0/24
+        ceph_cluster_network_ip: 192.168.10.10
+        ceph_ods_devices:
+          - /dev/sda
+          - /dev/sdb
+      ceph-shell:
+        ansible_connection: docker
+        ansible_docker_extra_args: "-H=tcp://ceph-mon1.local:2375"
+        remote_tmp: /tmp/.ansible
+        ansible_user: root
+scenario:
+  name: int
+  converge_sequence:
+    - converge
+verifier:
+  name: ansible

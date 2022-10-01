@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: all
+  tasks:
+    - name: "Include bassinator.ceph"
+      ansible.builtin.include_role:
+        name: "bassinator.ceph"
