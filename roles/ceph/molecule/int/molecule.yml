@@ -23,7 +23,7 @@ provisioner:
   inventory:
     host_vars:
       ceph-mon1:
-        raw_hostname: '0x55d28e08'
+        raw_hostname: '0x54a2adca'
         hostname: ceph-mon1
         ansible_host: "{{ hostname }}.local"
         ansible_user: pi
