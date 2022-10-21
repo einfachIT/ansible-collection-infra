@@ -1,0 +1,20 @@
+---
+galaxy_info:
+  role_name: os_controller
+  author: bassinator
+  namespace: einfachit
+  description: setup openstack cloud
+  company: einfach IT
+
+  license: GNU GPLv3
+
+  min_ansible_version: "2.4"
+
+  platforms:
+    - name: Debian
+      release:
+        - 'bullseye'
+
+  galaxy_tags: [raspberry, openstack]
+
+dependencies: []

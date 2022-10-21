@@ -1,0 +1,38 @@
+---
+- name: Decommission raspberries
+  hosts: raspberries
+  ignore_unreachable: true
+  become: true
+  gather_facts: false
+  tasks:
+
+  - name: Reset machine to plain os by restoring image from a recovery partition
+    ansible.builtin.command: /boot/boot_to_recovery restore
+    async: 1000
+    poll: 0
+    changed_when: true
+    notify:
+      - Remove hostname from known_hosts
+      - Set new ansible_hostname
+      - Wait to reboot after restore
+
+  handlers:
+
+    - name: Remove hostname from known_hosts
+      ansible.builtin.known_hosts:
+        name: "{{ ansible_host }}"
+        path: ~/.ssh/known_hosts
+        state: absent
+      delegate_to: localhost
+      throttle: 1
+      become: false
+      changed_when: false
+
+    - name: Set new ansible_hostname
+      ansible.builtin.set_fact:
+        ansible_host: "{{ raw_hostname }}.local"
+
+    - name: Wait to reboot after restore
+      ansible.builtin.wait_for_connection:
+        delay: 60
+        timeout: 2000

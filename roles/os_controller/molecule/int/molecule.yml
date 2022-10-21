@@ -1,0 +1,34 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: delegated
+lint: |
+  set -e
+  yamllint .
+  ansible-lint
+platforms:
+  - name: os-controller1
+    groups:
+      - raspberries
+      - os
+      - docker_host
+provisioner:
+  name: ansible
+  inventory:
+    host_vars:
+      os-controller1:
+        raw_hostname: '0x54a2adca'
+        hostname: os-controller1
+        ansible_host: "{{ hostname }}.local"
+        ansible_user: pi
+        ansible_ssh_pass: raspberry
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+        ansible_python_interpreter: /usr/bin/python3
+scenario:
+  name: int
+  converge_sequence:
+    - dependency
+    - converge
+verifier:
+  name: ansible
