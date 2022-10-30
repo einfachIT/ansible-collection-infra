@@ -1,6 +1,6 @@
 ---
 - name: Converge - init cloud
-  hosts: all
+  hosts: os
   become: true
   vars:
     fail_on_service_errors: false

@@ -12,7 +12,9 @@ platforms:
     groups:
       - raspberries
       - os
-      - docker_host
+  - name: docker-registry
+    groups:
+      - container
 provisioner:
   name: ansible
   inventory:
@@ -24,6 +26,14 @@ provisioner:
         ansible_user: pi
         ansible_ssh_pass: raspberry
         ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+        ansible_python_interpreter: /usr/bin/python3
+      docker-registry:
+        ansible_connection: docker
+        remote_tmp: /tmp/.ansible
+        ansible_user: root
+        image: "registry:2"
+        docker_keep_volumes: true # do not delete home directories when deleting container
+        docker_host: "docker-horst.local"
         ansible_python_interpreter: /usr/bin/python3
 scenario:
   name: int
