@@ -15,7 +15,7 @@
 
 - name: Get list of already registered Nodes
   ansible.builtin.command:
-    cmd: "ceph orch host ls --format json {{ hostname }}"
+    cmd: "ceph orch host ls --format yaml {{ hostname }}"
   delegate_to: ceph-shell
   register: osd_info
   changed_when: false

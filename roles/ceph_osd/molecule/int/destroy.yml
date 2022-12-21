@@ -1,6 +1,6 @@
 ---
 - name: Decommission raspberries
-  hosts: managed
+  hosts: raspberries
   ignore_unreachable: true
   become: true
   gather_facts: false
@@ -29,7 +29,8 @@
       changed_when: false
 
     - name: Set new ansible_hostname
-      ansible.builtin.set_fact: ansible_host="{{ raw_hostname }}.local"
+      ansible.builtin.set_fact:
+        ansible_host: "{{ raw_hostname }}.local"
 
     - name: Wait to reboot after restore
       ansible.builtin.wait_for_connection:

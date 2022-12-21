@@ -5,4 +5,4 @@
   tasks:
     - name: "Include bassinator.ceph_osd role"
       ansible.builtin.include_role:
-        name: "bassinator.ceph_osd"
+        name: "einfachit.hpc.ceph_osd"

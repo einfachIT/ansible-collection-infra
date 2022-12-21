@@ -15,8 +15,15 @@ platforms:
   - name: docker-registry
     groups:
       - container
+  - name: kolla-builder
+    groups:
+      - container
+  - name: docker-host
 provisioner:
   name: ansible
+  config_options:
+    defaults:
+      remote_tmp: /tmp/
   inventory:
     host_vars:
       os-controller1:
@@ -28,13 +35,29 @@ provisioner:
         ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
         ansible_python_interpreter: /usr/bin/python3
       docker-registry:
-        ansible_connection: docker
-        remote_tmp: /tmp/.ansible
-        ansible_user: root
         image: "registry:2"
-        docker_keep_volumes: true # do not delete home directories when deleting container
-        docker_host: "docker-horst.local"
+        ports:
+          - "5000:5000"
+        command: []
+      kolla-builder:
+        image: "ubuntu:focal"
+        ports: []
+        command: ["sleep", "infinity"]
+      docker-host:
+        hostname: docker-horst
+        ansible_host: "{{ hostname }}.local"
+        ansible_user: pi
+        ansible_ssh_pass: raspberry
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
         ansible_python_interpreter: /usr/bin/python3
+    group_vars:
+      container:
+        ansible_connection: docker
+        docker_keep_volumes: true # do not delete home directories when deleting container
+        docker_api_host: "docker-horst.local"
+        docker_host: "tcp://{{ docker_api_host }}:2375"
+        ansible_python_interpreter: /usr/bin/python3
+
 scenario:
   name: int
   converge_sequence:

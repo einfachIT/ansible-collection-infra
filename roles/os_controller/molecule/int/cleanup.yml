@@ -1,0 +1,28 @@
+---
+- name: Decommission container
+  hosts: container
+  gather_facts: false
+  connection: local
+  tasks:
+
+  - name: Wait for docker api to get available
+    ansible.builtin.wait_for:
+      port: 2375
+      host: "{{ docker_host }}"
+      # search_regex: Connected
+      timeout: 10
+    vars:
+      ansible_connection: local
+    failed_when: false
+    delegate_to: localhost
+    when: docker_host != 'localhost'
+    register: docker_api_connect
+
+  - name: Delete container
+    ansible.builtin.docker_container:
+      name: "{{ inventory_hostname }}"
+      docker_host: " tcp://{{ docker_host }}:2375"
+      container_default_behavior: no_defaults
+      state: absent
+    delegate_to: localhost
+    when: docker_host == 'localhost' or docker_api_connect.elapsed < 10

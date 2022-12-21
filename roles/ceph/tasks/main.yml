@@ -27,11 +27,8 @@
     cmd: >
       cephadm bootstrap
       --mon-ip {{ ansible_default_ipv4.address }}
-      --initial-dashboard-user admin
-      --initial-dashboard-password admin
-      --dashboard-password-noupdate
+      --skip-dashboard
       --skip-mon-network
-      --sip-dashboard
       --skip-monitoring-stack
       --cluster-network {{ ceph_cluster_network }}
     creates: /etc/ceph/ceph.conf

@@ -39,9 +39,11 @@
         dest: /tmp/zram-swap-config
 
     - name: Install zram-swap-config
-      ansible.builtin.command:
-        cmd: sh install.sh
-        chdir: /tmp/zram-swap-config/
+      ansible.builtin.script:
+        cmd: install.sh
+        remote_src: true
+        chdir: /tmp/zram-swap-config 
+      args:
         creates: /etc/zram-swap-config.conf
 
     - name: Configure zram swap
@@ -57,9 +59,6 @@
           SWAPPINESS=80
       notify:
         - Reboot server
-
-    - name: Force all notified handlers to run
-      ansible.builtin.meta: flush_handlers
 
   handlers:
     - name: Reboot server
