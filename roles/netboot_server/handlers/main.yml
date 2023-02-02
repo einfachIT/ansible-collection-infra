@@ -1,0 +1,45 @@
+---
+
+
+- name: Copy client root filesystem
+  ansible.posix.synchronize:
+    src: /tmp/raspios/
+    dest: /nfs/client1
+  register: root_sync
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Configure client root filesystem
+  ansible.builtin.shell: |
+    cd /nfs/client1
+    mount --bind /dev dev
+    mount --bind /sys sys
+    mount --bind /proc proc
+    chroot . rm /etc/ssh/ssh_host_*
+    chroot . dpkg-reconfigure openssh-server
+    chroot . systemctl enable ssh
+    umount dev sys proc
+  when: root_sync.changed
+
+- name: Setup network service
+  ansible.builtin.service:
+    name: systemd-networkd
+    state: restarted
+    enabled: true
+
+- name: Setup dnsmasq service
+  ansible.builtin.service:
+    name: dnsmasq
+    state: restarted
+    enabled: true
+
+- name: Restart rpcbind
+  ansible.builtin.service:
+    name: rpcbind
+    state: restarted
+    enabled: true
+
+- name: Restart nfs server
+  ansible.builtin.service:
+    name: nfs-kernel-server
+    state: restarted
+    enabled: true

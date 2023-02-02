@@ -1,0 +1,10 @@
+---
+- name: Converge - setup netboot server
+  hosts: netboot_server
+  become: true
+  vars:
+    fail_on_service_errors: false
+  tasks:
+    - name: "Include netboot_server role"
+      ansible.builtin.include_role:
+        name: "einfachit.hpc.netboot_server"

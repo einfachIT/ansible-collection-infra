@@ -7,10 +7,12 @@
   pre_tasks:
 
     - name: Set ansible hostname to raw_hostname
-      ansible.builtin.set_fact: ansible_host="{{ raw_hostname }}.local"
+      ansible.builtin.set_fact:
+        ansible_host: "{{ raw_hostname }}.local"
 
     - name: Update apt cache with sudo apt-get --allow-releaseinfo-change update
-      ansible.builtin.command: sudo apt-get --allow-releaseinfo-change update
+      ansible.builtin.command:
+        cmd: sudo apt-get --allow-releaseinfo-change update
       changed_when: false
 
     - name: Gather the package facts
@@ -46,7 +48,8 @@
       changed_when: false
 
     - name: Set ansible hostname to ip address
-      ansible.builtin.set_fact: ansible_host="{{ ansible_default_ipv4.address }}"
+      ansible.builtin.set_fact:
+        ansible_host: "{{ ansible_default_ipv4.address }}"
 
     - name: Set a hostname
       ansible.builtin.hostname:
@@ -63,12 +66,13 @@
         mode: '0644'
 
     - name: Reboot server
-      ansible.builtin.command: reboot
+      ansible.builtin.command:
+        cmd: reboot
       async: 100
       poll: 0
       changed_when: false
 
-    - name: Remove entry from known_hosts (ip-address, original hostkey which will change after reboot)
+    - name: Remove entry from known_hosts
       ansible.builtin.known_hosts:
         name: "{{ ansible_host }}"
         path: ~/.ssh/known_hosts
@@ -79,7 +83,8 @@
       changed_when: false
 
     - name: Set ansible hostname to new name
-      ansible.builtin.set_fact: ansible_host="{{ hostname }}.local"
+      ansible.builtin.set_fact:
+        ansible_host: "{{ hostname }}.local"
 
     - name: Wait 600 seconds, but only start checking after 60 seconds
       ansible.builtin.wait_for_connection:

@@ -17,20 +17,15 @@
     group: root
     state: directory
 
-# - name: Add repo for ceph pacific release
-#   ansible.builtin.command:
-#     cmd: cephadm add-repo --release pacific
-#     creates: /etc/apt/sources.list.d/ceph.list
-
 - name: Bootstrap ceph cluster
   ansible.builtin.command:
     cmd: >
       cephadm bootstrap
       --mon-ip {{ ansible_default_ipv4.address }}
-      --skip-dashboard
-      --skip-mon-network
       --skip-monitoring-stack
       --cluster-network {{ ceph_cluster_network }}
+      --initial-dashboard-user admin
+      --initial-dashboard-password passw0rd
     creates: /etc/ceph/ceph.conf
   register: ceph
 
@@ -62,4 +57,4 @@
       - /etc/ceph/ceph.conf:/etc/ceph/ceph.conf:z
       - /etc/ceph/ceph.client.admin.keyring:/etc/ceph/ceph.keyring:z
     entrypoint: bash
-  notify: Configure auto add available devices
+  # notify: Configure auto add available devices

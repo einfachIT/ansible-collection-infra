@@ -1,0 +1,144 @@
+---
+- name: Install prerequisites
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: true
+  loop:
+    - rsync
+    - sshpass
+    - dnsmasq
+    - nfs-kernel-server
+
+- name: Download raspios image
+  ansible.builtin.get_url:
+    url: "https://downloads.raspberrypi.org/\
+      raspios_lite_arm64/images/\
+      raspios_lite_arm64-2022-09-26/\
+      2022-09-22-raspios-bullseye-arm64-lite.img.xz"
+    dest: /tmp
+    mode: 0644
+
+- name: Unarchive raspios image
+  ansible.builtin.command:
+    cmd: unxz --keep /tmp/2022-09-22-raspios-bullseye-arm64-lite.img.xz
+    creates: /tmp/2022-09-22-raspios-bullseye-arm64-lite.img
+
+- name: Create loop devices
+  ansible.builtin.command:
+    cmd: losetup -P /dev/loop0 /tmp/2022-09-22-raspios-bullseye-arm64-lite.img
+    creates: /dev/loop0p1
+
+- name: Create mountpoint
+  ansible.builtin.file:
+    path: "/tmp/raspios"
+    state: directory
+    mode: '0755'
+
+- name: Mount raspios image
+  ansible.posix.mount:
+    path: "{{ item.path }}"
+    src: "{{ item.src }}"
+    fstype: "{{ item.fstype }}"
+    opts: ro
+    state: mounted
+  loop:
+    - path: /tmp/raspios
+      src: /dev/loop0p2
+      fstype: ext4
+    - path: /tmp/raspios/boot
+      src: /dev/loop0p1
+      fstype: msdos
+
+- name: Create nfs and tftp boot directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /nfs/client1
+    - /tftpboot
+  notify:
+    - Copy client root filesystem
+    - Configure client root filesystem
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Disable DHCP client
+  ansible.builtin.copy:
+    dest: /etc/systemd/network/10-eth0.netdev
+    content: |
+      [Match]
+      Name=eth0
+      [Network]
+      DHCP=no
+  notify:
+    - Setup network service
+
+# - name: Disable DHCP client
+#   ansible.builtin.copy:
+#     dest: /etc/systemd/network/11-eth0.network
+#     content: |
+#       [Match]
+#       Name=eth0
+#       [Network]
+#       Address=192.168.2.150/24
+#       DNS=192.168.2.1
+#       Gateway=192.168.2.1
+#   notify:
+#     - Setup network service
+
+- name: Configure dnsmask
+  ansible.builtin.copy:
+    dest: /etc/dnsmasq.conf
+    content: |
+      interface=eth0
+      no-hosts
+      dhcp-range=192.168.2.101,192.168.2.149,12h
+      dhcp-option=3,192.168.2.1
+      dhcp-option=6,192.168.2.1
+      log-dhcp
+      enable-tftp
+      tftp-root=/tftpboot
+      pxe-service=0,"Raspberry Pi Boot"
+  notify:
+    - Setup dnsmasq service
+
+- name: Copy boot
+  ansible.builtin.copy:
+    src: /nfs/client1/boot/bootcode.bin
+    dest: /tftpboot/
+    remote_src: true
+    force: false
+
+- name: Create link to boot directory
+  ansible.builtin.file:
+    src: /nfs/client1/boot
+    dest: /tftpboot/b5178dc8
+    state: link
+
+- name: Update cmdline.txt for nfs root
+  ansible.builtin.copy:
+    content: >
+      console=serial0,115200 console=tty1 root=/dev/nfs
+      nfsroot=192.168.2.150:/nfs/client1,vers=3 rw
+      ip=dhcp rootwait elevator=deadline
+    dest: /nfs/client1/boot/cmdline.txt
+
+- name: configure nfs exports
+  ansible.builtin.copy:
+    dest: /etc/exports
+    content: |
+      /nfs/client1 *(rw,sync,no_subtree_check,no_root_squash)
+      /tftpboot *(rw,sync,no_subtree_check,no_root_squash)
+
+- name: configure mount in client fs
+  ansible.builtin.copy:
+    dest: /nfs/client1/etc/fstab
+    content: |
+      proc       /proc        proc     defaults    0    0
+      192.168.2.150:/tftpboot /boot nfs defaults,vers=3 0 0
+  notify:
+    - Restart rpcbind
+    - Restart nfs server

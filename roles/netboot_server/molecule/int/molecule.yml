@@ -1,0 +1,35 @@
+---
+dependency:
+  name: galaxy
+prerun: false
+driver:
+  name: delegated
+lint: |
+  set -e
+  yamllint .
+  ansible-lint
+platforms:
+  - name: mighty-mouse
+    groups:
+      - raspberries
+      - netboot_server
+provisioner:
+  name: ansible
+  inventory:
+    host_vars:
+      mighty-mouse:
+        raw_hostname: '0x5662ada8' # rpi4 4GB
+        hostname: mighty-mouse
+        ansible_host: "{{ hostname }}.lan"
+        ansible_user: pi
+        ansible_ssh_pass: raspberry
+        ansible_ssh_common_args: |
+          -o StrictHostKeyChecking=no
+          -o UserKnownHostsFile=/dev/null
+        ansible_python_interpreter: /usr/bin/python3
+scenario:
+  name: int
+  converge_sequence:
+    - converge
+verifier:
+  name: ansible

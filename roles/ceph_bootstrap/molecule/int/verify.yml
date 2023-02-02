@@ -30,7 +30,7 @@
         - daemons.stdout is search("mon.ceph")
     changed_when: false
 
-- name: Verify ceph-shell
+- name: Verify ceph-cluster
   hosts: ceph-shell
   connection: docker
   gather_facts: false
@@ -45,3 +45,15 @@
     - name: Debug out
       ansible.builtin.debug:
         var: ceph_health.stdout
+
+    - name: Get list of already registered Nodes
+      ansible.builtin.command:
+        cmd: "ceph orch host ls --format json"
+      delegate_to: ceph-shell
+      register: osd_info
+      changed_when: false
+
+    - name: Assert all nodes are registered
+      ansible.builtin.assert:
+        that:
+          - osd_info.stdout != ""

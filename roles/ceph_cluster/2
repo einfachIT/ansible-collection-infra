@@ -37,12 +37,13 @@
       ansible.builtin.git:
         repo: "https://github.com/StuartIanNaylor/zram-swap-config"
         dest: /tmp/zram-swap-config
-        version: f62bb382d964be9661df3bd51aacaec05299dea9
 
     - name: Install zram-swap-config
-      ansible.builtin.command:
-        cmd: sh install.sh
-        chdir: /tmp/zram-swap-config/
+      ansible.builtin.script:
+        cmd: install.sh
+        remote_src: true
+        chdir: /tmp/zram-swap-config 
+      args:
         creates: /etc/zram-swap-config.conf
 
     - name: Configure zram swap
@@ -56,22 +57,8 @@
           SWAP_PRI=75
           PAGE_CLUSTER=0
           SWAPPINESS=80
-        mode: 0644
       notify:
         - Reboot server
-
-    - name: Configure to use swap sooner
-      ansible.builtin.blockinfile:
-        path: /etc/sysctl.conf
-        block: |
-          vm.vfs_cache_pressure=500
-          vm.swappiness=100
-          vm.dirty_background_ratio=1
-          vm.dirty_ratio=50
-
-
-    - name: Force all notified handlers to run
-      ansible.builtin.meta: flush_handlers
 
   handlers:
     - name: Reboot server
@@ -91,4 +78,4 @@
 
   roles:
 
-    - role: einfachit.hpc.ceph_bootstrap
+    - role: einfachit.hpc.ceph
