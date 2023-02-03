@@ -18,7 +18,7 @@ provisioner:
   inventory:
     host_vars:
       mighty-mouse:
-        raw_hostname: '0x5662ada8' # rpi4 4GB
+        raw_hostname: '0x5652a71d'  # rpi4 4GB
         hostname: mighty-mouse
         ansible_host: "{{ hostname }}.lan"
         ansible_user: pi
@@ -27,6 +27,8 @@ provisioner:
           -o StrictHostKeyChecking=no
           -o UserKnownHostsFile=/dev/null
         ansible_python_interpreter: /usr/bin/python3
+  env:
+    ANSIBLE_ROLES_PATH: "../../roles"
 scenario:
   name: int
   converge_sequence:

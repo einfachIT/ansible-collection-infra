@@ -8,18 +8,6 @@
   register: root_sync
   delegate_to: "{{ inventory_hostname }}"
 
-- name: Configure client root filesystem
-  ansible.builtin.shell: |
-    cd /nfs/client1
-    mount --bind /dev dev
-    mount --bind /sys sys
-    mount --bind /proc proc
-    chroot . rm /etc/ssh/ssh_host_*
-    chroot . dpkg-reconfigure openssh-server
-    chroot . systemctl enable ssh
-    umount dev sys proc
-  when: root_sync.changed
-
 - name: Setup network service
   ansible.builtin.service:
     name: systemd-networkd

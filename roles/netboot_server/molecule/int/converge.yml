@@ -7,4 +7,4 @@
   tasks:
     - name: "Include netboot_server role"
       ansible.builtin.include_role:
-        name: "einfachit.hpc.netboot_server"
+        name: "netboot_server"
