@@ -3,7 +3,7 @@ dependency:
   name: galaxy
 prerun: false
 driver:
-  name: delegated
+  name: default
 lint: |
   set -e
   yamllint .
@@ -18,11 +18,10 @@ provisioner:
   inventory:
     host_vars:
       mighty-mouse:
-        raw_hostname: '0x5652a71d'  # rpi4 4GB
+        raw_hostname: 'raspberrypi'  # rpi4 4GB
         hostname: mighty-mouse
-        ansible_host: "{{ hostname }}.lan"
-        ansible_user: pi
-        ansible_ssh_pass: raspberry
+        ansible_host: "{{ hostname }}.local"
+        ansible_user: epic 
         ansible_ssh_common_args: |
           -o StrictHostKeyChecking=no
           -o UserKnownHostsFile=/dev/null
