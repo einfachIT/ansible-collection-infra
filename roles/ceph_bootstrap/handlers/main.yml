@@ -1,6 +1,0 @@
----
-
-- name: Configure auto add available devices
-  ansible.builtin.command:
-    cmd: ceph orch apply osd --all-available-devices
-  delegate_to: ceph-shell

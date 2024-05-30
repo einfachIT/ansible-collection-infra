@@ -1,8 +1,0 @@
-- create ods manually, remove auto_all ...
-
-- create cephfs
-
-- create mds automatically or manually to create cephfs
-https://docs.ceph.com/en/quincy/cephfs/createfs/
-
-- ceck mount in verify

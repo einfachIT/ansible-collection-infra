@@ -1,6 +1,0 @@
-{
-    "bridge": "none",
-    "ip-forward": false,
-    "insecure-registries":["karl-heinz.local:5000"],
-    "iptables": false
-}

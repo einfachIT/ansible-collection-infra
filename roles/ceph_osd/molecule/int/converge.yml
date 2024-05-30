@@ -1,8 +1,0 @@
----
-- name: Converge - configure osd host
-  hosts: ceph_osd
-  become: true
-  tasks:
-    - name: "Include bassinator.ceph_osd role"
-      ansible.builtin.include_role:
-        name: "einfachit.hpc.ceph_osd"

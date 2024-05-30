@@ -1,8 +1,0 @@
----
-- name: Converge - configure osd host
-  hosts: ceph-shell
-  become: true
-  tasks:
-    - name: "Include ceph_cluster role"
-      ansible.builtin.include_role:
-        name: "einfachit.hpc.ceph_cluster"
