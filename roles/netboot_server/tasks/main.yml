@@ -61,7 +61,6 @@
     - /tftpboot
   notify:
     - Copy client root filesystem
-    - Configure client root filesystem
 
 - name: Flush handlers
   ansible.builtin.meta: flush_handlers
@@ -72,12 +71,10 @@
     content: |
       interface=eth0
       no-hosts
-      dhcp-range=192.168.2.101,192.168.2.149,12h
-      dhcp-option=3,192.168.2.1
-      dhcp-option=6,192.168.2.1
+      dhcp-range={{ netboot_server_dhcp_range }}
       log-dhcp
       enable-tftp
-      tftp-root=/tftpboot
+      tftp-root={{ netboot_server_tftp_root }}
       pxe-service=0,"Raspberry Pi Boot"
   notify:
     - Setup dnsmasq service
@@ -99,7 +96,7 @@
   ansible.builtin.copy:
     content: >
       console=serial0,115200 console=tty1 root=/dev/nfs
-      nfsroot=192.168.2.150:/nfs/client1,vers=3 rw
+      nfsroot={{ netboot_server_ip_address }}:/nfs/client1,vers=3 rw
       ip=dhcp rootwait quite
     dest: /nfs/client1/boot/cmdline.txt
 
@@ -114,20 +111,20 @@
     cmd: touch /nfs/client1/boot/ssh
     creates: /nfs/client1/boot/ssh
 
-- name: Donfigure nfs exports
+- name: Configure nfs exports
   ansible.builtin.copy:
     dest: /etc/exports
     content: |
-      /nfs/client1 *(rw,sync,no_subtree_check,no_root_squash)
-      /tftpboot/b5178dc8 *(rw,sync,no_subtree_check,no_root_squash)
+      /nfs/ *(rw,sync,subtree_check,no_root_squash)
+      # /tftpboot/ *(rw,sync,subtree_check,no_root_squash)
   notify:
     - Restart rpcbind
     - Restart nfs server
 
-- name: Configure mount in client fs
-  ansible.builtin.copy:
-    dest: /nfs/client1/etc/fstab
-    content: |
-      proc       /proc        proc     defaults    0    0
-      192.168.2.150:/tftpboot/b5178dc8 /boot nfs defaults,vers=3 0 0
+      #- name: Configure mount in client fs
+      #  ansible.builtin.copy:
+      #    dest: /nfs/client1/etc/fstab
+      #    content: |
+      #      proc       /proc        proc     defaults    0    0
+      #      192.168.2.150:/tftpboot/b5178dc8 /boot nfs defaults,vers=3 0 0
 
