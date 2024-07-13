@@ -57,8 +57,8 @@
     state: directory
     mode: '0755'
   loop:
-    - /nfs/client1
-    - /tftpboot
+    - "{{ netboot_server_data_dir }}/nfs/"
+    - "{{ netboot_server_tftp_root }}"
   notify:
     - Copy client root filesystem
 
@@ -81,50 +81,17 @@
 
 - name: Copy boot
   ansible.builtin.copy:
-    src: /nfs/client1/boot/bootcode.bin
+    src: /boot/bootcode.bin
     dest: /tftpboot/
     remote_src: true
     force: false
 
-- name: Create link to boot directory
-  ansible.builtin.file:
-    src: /nfs/client1/boot
-    dest: /tftpboot/b5178dc8
-    state: link
-
-- name: Update cmdline.txt for nfs root
-  ansible.builtin.copy:
-    content: >
-      console=serial0,115200 console=tty1 root=/dev/nfs
-      nfsroot={{ netboot_server_ip_address }}:/nfs/client1,vers=3 rw
-      ip=dhcp rootwait quite
-    dest: /nfs/client1/boot/cmdline.txt
-
-- name: Set default user and pw
-  ansible.builtin.copy:
-    content: >
-      pi:$5$w0pHM4Tsis$rr5lEiw2tj62u5iVGZE2oDLQrn9kyr3l50yz9k2YNA3
-    dest: /nfs/client1/boot/userconf.txt
-
-- name: Enable ssh
-  ansible.builtin.command:
-    cmd: touch /nfs/client1/boot/ssh
-    creates: /nfs/client1/boot/ssh
 
 - name: Configure nfs exports
   ansible.builtin.copy:
     dest: /etc/exports
     content: |
-      /nfs/ *(rw,sync,subtree_check,no_root_squash)
-      # /tftpboot/ *(rw,sync,subtree_check,no_root_squash)
+      {{ netboot_server_data_dir }}/nfs/ *(rw,sync,subtree_check,no_root_squash)
   notify:
     - Restart rpcbind
     - Restart nfs server
-
-      #- name: Configure mount in client fs
-      #  ansible.builtin.copy:
-      #    dest: /nfs/client1/etc/fstab
-      #    content: |
-      #      proc       /proc        proc     defaults    0    0
-      #      192.168.2.150:/tftpboot/b5178dc8 /boot nfs defaults,vers=3 0 0
-

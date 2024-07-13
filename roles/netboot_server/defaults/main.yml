@@ -2,3 +2,4 @@
 netboot_server_dhcp_range: "192.168.178.0,proxy"
 netboot_server_tftp_root: "/tftpboot"
 netboot_server_ip_address: "{{ ansible_default_ipv4.address }}"
+netboot_server_data_dir: "/data"
