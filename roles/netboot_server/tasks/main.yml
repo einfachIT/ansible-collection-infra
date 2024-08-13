@@ -1,4 +1,9 @@
 ---
+
+- name: Print all available facts
+  ansible.builtin.debug:
+    var: ansible_facts
+
 - name: Install prerequisites
   ansible.builtin.apt:
     name: "{{ item }}"
@@ -8,48 +13,8 @@
     - rsync
     - sshpass
     - dnsmasq
+    - tcpdump
     - nfs-kernel-server
-
-- name: Download raspios image
-  ansible.builtin.get_url:
-    url: "https://downloads.raspberrypi.org/\
-      raspios_lite_arm64/images/\
-      raspios_lite_arm64-2022-09-26/\
-      2022-09-22-raspios-bullseye-arm64-lite.img.xz"
-    dest: /tmp
-    mode: 0644
-
-- name: Unarchive raspios image
-  ansible.builtin.command:
-    cmd: unxz --keep /tmp/2022-09-22-raspios-bullseye-arm64-lite.img.xz
-    creates: /tmp/2022-09-22-raspios-bullseye-arm64-lite.img
-
-- name: Create loop devices
-  ansible.builtin.command:
-    cmd: losetup -P /dev/loop0 /tmp/2022-09-22-raspios-bullseye-arm64-lite.img
-    creates: /dev/loop0p1
-
-- name: Create mountpoint
-  ansible.builtin.file:
-    path: "/tmp/raspios"
-    state: directory
-    mode: '0755'
-
-- name: Mount raspios image
-  ansible.posix.mount:
-    path: "{{ item.path }}"
-    src: "{{ item.src }}"
-    fstype: "{{ item.fstype }}"
-    opts: ro
-    boot: false
-    state: mounted
-  loop:
-    - path: /tmp/raspios
-      src: /dev/loop0p2
-      fstype: ext4
-    - path: /tmp/raspios/boot
-      src: /dev/loop0p1
-      fstype: vfat
 
 - name: Create nfs and tftp boot directories
   ansible.builtin.file:
@@ -57,10 +22,9 @@
     state: directory
     mode: '0755'
   loop:
-    - "{{ netboot_server_data_dir }}/nfs/"
+    - "{{ netboot_server_nfs_root }}"
     - "{{ netboot_server_tftp_root }}"
-  notify:
-    - Copy client root filesystem
+
 
 - name: Flush handlers
   ansible.builtin.meta: flush_handlers
@@ -70,7 +34,6 @@
     dest: /etc/dnsmasq.conf
     content: |
       interface=eth0
-      no-hosts
       dhcp-range={{ netboot_server_dhcp_range }}
       log-dhcp
       enable-tftp
@@ -79,19 +42,28 @@
   notify:
     - Setup dnsmasq service
 
-- name: Copy boot
-  ansible.builtin.copy:
-    src: /boot/bootcode.bin
-    dest: /tftpboot/
-    remote_src: true
-    force: false
-
-
 - name: Configure nfs exports
   ansible.builtin.copy:
     dest: /etc/exports
     content: |
-      {{ netboot_server_data_dir }}/nfs/ *(rw,sync,subtree_check,no_root_squash)
+      {{ netboot_server_data_dir }} *(rw,sync,no_subtree_check,no_root_squash,crossmnt)
+      {{ netboot_server_nfs_root }} *(rw,sync,subtree_check,no_root_squash)
   notify:
     - Restart rpcbind
     - Restart nfs server
+
+- name: Copy cli scripts
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/usr/sbin/{{ item }}"
+    owner: root
+    group: root
+    mode: '0744'
+  loop:
+    - piaas_image
+    - piaas_instance
+
+- name: Copy default custom.toml
+  ansible.builtin.copy:
+    src: "custom.toml"
+    dest: "{{ netboot_server_config_root }}"

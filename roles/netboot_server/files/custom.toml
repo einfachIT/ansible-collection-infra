@@ -1,0 +1,47 @@
+# Raspberry PI OS config.toml
+# This file is used for the initial setup of the system on the first boot, if
+# it's s present in the boot partition of the installation.
+#
+# This file is loaded by firstboot, parsed by init_config and ends up
+# as several calls to imager_custom.
+# The example below has all current fields.
+#
+# References:
+# - https://github.com/RPi-Distro/raspberrypi-sys-mods/blob/master/usr/lib/raspberrypi-sys-mods/firstboot
+# - https://github.com/RPi-Distro/raspberrypi-sys-mods/blob/master/usr/lib/raspberrypi-sys-mods/init_config
+# - https://github.com/RPi-Distro/raspberrypi-sys-mods/blob/master/usr/lib/raspberrypi-sys-mods/imager_custom
+
+# Required:
+config_version = 1
+
+[system]
+hostname = "raspberrypi"
+
+[user]
+# If present, the default "rpi" user gets renamed to this "name"
+name = "epic"
+# The password can be encrypted or plain. To encrypt, we can use "openssl passwd -5 epic"
+password = "$5$qD8UY8yME0vXV9WX$1MtW40rde/2/xbpG8h.YSRmhBpaNih61qUCIfgha/KB"
+password_encrypted = true
+
+[ssh]
+# ssh_import_id = "gh:user" # import public keys from github
+enabled = true
+password_authentication = false
+# We can also seed the ssh public keys configured for the default user:
+# authorized_keys = [ "ssh-rsa ... user@host", ... ]
+authorized_keys = [ "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDRSywKgwQe33PAu1REyP5N0DR1qkiQTZdCU0rorDi4NnjJb6StSG1c7szQfakTlsjpzdKMifBpKUs8DU+4/ttv3qKvsTTCB8RrCtnXVkFv6m8Qfxao2WM68iVplRU/f7stblThR5Kq3dKgYVsHHkf8upsgS85QmR72XbyE/0ZCsCoOanqzm+HiBD5n/hUVceDHj6Zb2hbbm0L5t8JPc8MynwO5qsCwC+DGC8F13gAQ9UjnlkCNc2rqyd7kJOh660gp2Gv6X8Uhn+EuHr7C8+Gc+DpCZICtoA9munFJkJfv3zpJGNliQqxk4px3uvs/mBEcoiFCOnnct5MNp+6FwUGp" ]
+
+#[wlan]
+#ssid = "mywifi"
+#password = "$5$pN7oRnie.WDOHoJY$aWEYmKUytN/S/bxMza5ksBiurbSJmcvcysBKHSmYa45"
+#password_encrypted = true
+#hidden = false
+## The country is written to /etc/default/crda
+## Reference: https://wireless.wiki.kernel.org/en/developers/Regulatory
+#country = "IE"
+
+[locale]
+keymap = "de_CH"
+timezone = "Europe/Zurich"
+
