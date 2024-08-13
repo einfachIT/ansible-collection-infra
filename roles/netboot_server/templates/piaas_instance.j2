@@ -40,9 +40,9 @@ function create() {
 
     echo > {{ netboot_server_nfs_root }}/${args["name"]}/etc/fstab
     echo "proc /proc proc defaults 0 0" >> {{ netboot_server_nfs_root }}/${args["name"]}/etc/fstab
-    echo "192.168.178.150:{{ netboot_server_nfs_root }}/${args["name"]}/boot/firmware /boot/firmware nfs defaults,vers=4.1,proto=tcp 0 0" >>  {{ netboot_server_nfs_root }}/${args["name"]}/etc/fstab
+    echo "{{ netboot_server_ip_address }}:{{ netboot_server_nfs_root }}/${args["name"]}/boot/firmware /boot/firmware nfs defaults,vers=4.1,proto=tcp 0 0" >>  {{ netboot_server_nfs_root }}/${args["name"]}/etc/fstab
 
-    echo "console=serial0,115200 console=tty1 root=/dev/nfs nfsroot=192.168.178.150:{{ netboot_server_nfs_root }}/${args["name"]},vers=3 rw ip=dhcp rootwait quite init=/usr/lib/raspberrypi-sys-mods/firstboot" >  {{ netboot_server_nfs_root }}/${args["name"]}/boot/firmware/cmdline.txt
+    echo "console=serial0,115200 console=tty1 root=/dev/nfs nfsroot={{ netboot_server_ip_address }}:{{ netboot_server_nfs_root }}/${args["name"]},vers=3 rw ip=dhcp rootwait quite init=/usr/lib/raspberrypi-sys-mods/firstboot" >  {{ netboot_server_nfs_root }}/${args["name"]}/boot/firmware/cmdline.txt
     rm  {{ netboot_server_nfs_root }}/${args["name"]}/etc/init.d/resize2fs_once
     sed "s/hostname =.*/hostname = \"${args["name"]}\"/g"  {{ netboot_server_config_root }}/custom.toml >  {{ netboot_server_nfs_root }}/${args["name"]}/boot/firmware/custom.toml
 
