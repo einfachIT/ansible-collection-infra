@@ -1,7 +1,7 @@
 #!/bin/bash
 
-mkvirtualenv ansible
-workon ansible
+python -m venv .venv
+source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install ansible molecule molecule-docker yamllint ansible-lint
 

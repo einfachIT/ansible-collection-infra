@@ -1,13 +1,6 @@
 ---
 
 
-- name: Copy client root filesystem
-  ansible.posix.synchronize:
-    src: /tmp/raspios/
-    dest: /nfs/client1
-  register: root_sync
-  delegate_to: "{{ inventory_hostname }}"
-
 - name: Setup network service
   ansible.builtin.service:
     name: systemd-networkd
