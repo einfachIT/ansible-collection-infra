@@ -25,6 +25,7 @@
     - "{{ netboot_server_nfs_root }}"
     - "{{ netboot_server_tftp_root }}"
 
+
 - name: Flush handlers
   ansible.builtin.meta: flush_handlers
 
@@ -66,4 +67,3 @@
   ansible.builtin.copy:
     src: "custom.toml"
     dest: "{{ netboot_server_config_root }}"
-

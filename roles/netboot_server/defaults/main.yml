@@ -1,4 +1,3 @@
----
 netboot_server_ip_address: "{{ ansible_default_ipv4.address }}"
 netboot_server_dhcp_range: "{{ ansible_facts['eth0']['ipv4']['network'] }},proxy"
 netboot_server_data_dir: "/data"
@@ -6,3 +5,4 @@ netboot_server_tftp_root: "{{ netboot_server_data_dir }}/tftpboot"
 netboot_server_nfs_root: "{{ netboot_server_data_dir }}/nfs"
 netboot_server_images_root: "{{ netboot_server_data_dir }}/images"
 netboot_server_config_root: "~/"
+
