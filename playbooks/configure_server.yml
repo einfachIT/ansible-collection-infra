@@ -8,3 +8,15 @@
   - name: Setup netboot server
     include_role:
       name: "einfachit.hpc.netboot_server"
+
+  - name: Create guacamole config docker volume
+    community.docker.docker_volume:
+      name: guac_config
+
+  - name: Install docker guacamole with docker
+    community.docker.docker_container:
+      name: guacamole
+      image: flcontainers/guacamole
+      volumes: 
+        - guac_config:/config
+      ports: 8080:8080
