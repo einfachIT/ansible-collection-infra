@@ -1,17 +1,11 @@
 ---
 
-- name: Print all available facts
-  ansible.builtin.debug:
-    var: ansible_facts
-
 - name: Install prerequisites
   ansible.builtin.apt:
     name: "{{ item }}"
     state: present
     update_cache: true
   loop:
-    - rsync
-    - sshpass
     - dnsmasq
     - tcpdump
     - nfs-kernel-server
@@ -23,6 +17,8 @@
     mode: '0755'
   loop:
     - "{{ netboot_server_nfs_root }}"
+    - "{{ netboot_server_nfs_root }}/upper"
+    - "{{ netboot_server_nfs_root }}/work"
     - "{{ netboot_server_tftp_root }}"
 
 
@@ -43,11 +39,12 @@
     - Setup dnsmasq service
 
 - name: Configure nfs exports
-  ansible.builtin.copy:
+  ansible.builtin.lineinfile:
     dest: /etc/exports
-    content: |
-      {{ netboot_server_data_dir }} *(rw,sync,no_subtree_check,no_root_squash,crossmnt)
-      {{ netboot_server_nfs_root }} *(rw,sync,subtree_check,no_root_squash)
+    line: "{{ item }}"
+  loop:
+    - "{{ netboot_server_data_dir }} *(rw,sync,no_root_squash,crossmnt)"
+    - "{{ netboot_server_nfs_root }} *(rw,sync,no_root_squash,crossmnt)"
   notify:
     - Restart rpcbind
     - Restart nfs server
