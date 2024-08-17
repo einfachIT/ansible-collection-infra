@@ -1,0 +1,24 @@
+---
+
+- name: Install needed packages
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: true
+  loop:
+    - rsync
+    - mini-httpd
+    - snmp
+  notify:
+    - Restart mini-httpd
+
+- name: configure mini-httpd
+  ansible.builtin.lineinfile:
+    dest: /etc/mini-httpd.conf
+    regexp: "{{ item.exp }}"
+    line: "{{ item.value }}"
+  loop:
+    - exp: "^host"
+      value: "host=0.0.0.0"
+    - exp: "^user"
+      value: "user={{ ansible_user }}"

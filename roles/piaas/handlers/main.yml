@@ -1,0 +1,7 @@
+---
+
+- name: Restart mini-httpd
+  ansible.builtin.service:
+    name: mini-httpd
+    state: restarted
+    enabled: true
