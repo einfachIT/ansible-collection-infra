@@ -6,6 +6,7 @@
     state: present
     update_cache: true
   loop:
+    - rsync
     - dnsmasq
     - tcpdump
     - nfs-kernel-server
