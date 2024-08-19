@@ -26,9 +26,23 @@ function install() {
     esac
   done
 
-  curl ${args["url"]} -o  {{ netboot_server_images_root }}/${args["name"]}.img.xz
-  cd {{ netboot_server_images_root }}
-  unxz ${args["name"]}.img.xz
+  if [ ! -d {{ netboot_server_images_root }}/${args["name"]} ]; then
+    curl ${args["url"]} -o  {{ netboot_server_images_root }}/${args["name"]}.img.xz
+    cd {{ netboot_server_images_root }}
+    unxz ${args["name"]}.img.xz
+    mkdir {{ netboot_server_images_root }}/${args["name"]}
+    mkdir /mnt/${args["name"]}
+    losetup -P /dev/loop0 {{ netboot_server_images_root }}/${args["name"]}.img
+    mount -o ro -t ext4 /dev/loop0p2 /mnt/${args["name"]}
+    mount -o ro -t vfat /dev/loop0p1 /mnt/${args["name"]}/boot/firmware
+    rsync -a /mnt/${args["name"]}/ {{ netboot_server_images_root }}/${args["name"]}
+    sudo umount /mnt/${args["name"]}/boot/firmware
+    sudo umount /mnt/${args["name"]}
+    sudo losetup -d /dev/loop0
+    rm -rf /mnt/${args["name"]}
+  else
+    echo image with name ${args["name"]} already exists
+  fi
 }
 
 if [[ "$1" != "_"* ]]; then

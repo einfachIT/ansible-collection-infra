@@ -2,6 +2,7 @@
 
 set -e
 
+function lineinfile() { line=${2//\//\\/} ; sed -i -e '/'"${1//\//\\/}"'/{s/.*/'"${line}"'/;:a;n;ba;q};$a'"${line}" "$3" ; }
 
 function create() {
   declare -A args=(
@@ -28,15 +29,12 @@ function create() {
 
   if [ ! -d {{ netboot_server_nfs_root }}/${args["name"]} ]; then
     mkdir {{ netboot_server_nfs_root }}/${args["name"]}
-    mkdir /mnt/${args["image"]}
-    losetup -P /dev/loop0 {{ netboot_server_images_root }}/${args["image"]}.img
-    mount -o ro -t ext4 /dev/loop0p2 /mnt/${args["image"]}
-    mount -o ro -t vfat /dev/loop0p1 /mnt/${args["image"]}/boot/firmware
-    rsync -a /mnt/${args["image"]}/ {{ netboot_server_nfs_root }}/${args["name"]}
-    sudo umount /mnt/${args["image"]}/boot/firmware
-    sudo umount /mnt/${args["image"]}
-    sudo losetup -d /dev/loop0
-    rm -rf /mnt/${args["image"]}
+    #rsync -a {{ netboot_server_images_root }}/${args["image"]}/ {{ netboot_server_nfs_root }}/${args["name"]}
+    mkdir {{ netboot_server_nfs_root }}/upper/${args["name"]}
+    mkdir {{ netboot_server_nfs_root }}/work/${args["name"]}
+    lineinfile "{{ netboot_server_nfs_root }}/${args['name']} " "overlay  {{ netboot_server_nfs_root }}/${args['name']} overlay noauto,x-systemd.automount,nfs_export=on,index=on,lowerdir={{ netboot_server_images_root }}/${args['image']},upperdir={{ netboot_server_nfs_root }}/upper/${args['name']},workdir={{ netboot_server_nfs_root }}/work/${args['name']} 0 0" /etc/fstab
+    systemctl daemon-reload
+    sudo mount {{ netboot_server_nfs_root }}/${args["name"]}
 
     echo > {{ netboot_server_nfs_root }}/${args["name"]}/etc/fstab
     echo "proc /proc proc defaults 0 0" >> {{ netboot_server_nfs_root }}/${args["name"]}/etc/fstab
@@ -50,6 +48,12 @@ function create() {
     mkdir {{ netboot_server_nfs_root }}/${args["name"]}/etc/skel/.config/
     printf "[output:HDMI-A-1]\nmode = 1920x1080@60\n" > {{ netboot_server_nfs_root }}/${args["name"]}/etc/skel/.config/wayfire.ini
 
+    # enable ssh login with password. Key auth not working for guacamole for now
+    sed -i "s/PasswordAuthentication.*/PasswordAuthentication yes/g" {{ netboot_server_nfs_root }}/${args["name"]}/etc/ssh/sshd_config
+
+    # add instance to be exported via nfs
+    lineinfile "{{ netboot_server_nfs_root }}/${args['name']} " "{{ netboot_server_nfs_root }}/${args['name']} *(rw,sync,no_root_squash)" /etc/exports
+    service  nfs-kernel-server restart
 
   else
     echo instance with name ${args["name"]} already exists
@@ -79,14 +83,16 @@ function delete(){
   # add check if instance is linked/running
   # for file in $(find /data/tftpboot/ -type l); do  readlink  "$file"; done
   if [ -d {{ netboot_server_nfs_root }}/${args["name"]} ]; then
+    umount  {{ netboot_server_nfs_root }}/${args["name"]}
     rm -rf {{ netboot_server_nfs_root }}/${args["name"]}
+    rm -rf {{ netboot_server_nfs_root }}/upper/${args["name"]}
+    rm -rf {{ netboot_server_nfs_root }}/work/${args["name"]}
+    sed -i "\|{{ netboot_server_nfs_root }}/${args['name']} |d" /etc/fstab
+    sed -i "\|{{ netboot_server_nfs_root }}/${args['name']} |d" /etc/exports
   else
     echo instance with name ${args["name"]} does not exists
   fi
-
 }
-
-
 
 function allocate_node() {
   declare -A args=(
