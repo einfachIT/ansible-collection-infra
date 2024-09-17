@@ -12,16 +12,3 @@
   - name: Setup piaas service
     include_role:
       name: "einfachit.hpc.piaas"
-
-  - name: Create guacamole config docker volume
-    community.docker.docker_volume:
-      name: guac_config
-
-  - name: Install docker guacamole with docker
-    community.docker.docker_container:
-      name: guacamole
-      image: flcontainers/guacamole
-      restart_policy: always
-      volumes: 
-        - guac_config:/config
-      ports: 8080:8080

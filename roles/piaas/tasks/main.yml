@@ -9,8 +9,6 @@
     - rsync
     - mini-httpd
     - snmp
-  notify:
-    - Restart mini-httpd
 
 - name: configure mini-httpd
   ansible.builtin.lineinfile:
@@ -21,4 +19,154 @@
     - exp: "^host"
       value: "host=0.0.0.0"
     - exp: "^user"
-      value: "user={{ ansible_user }}"
+      value: "user={{ piaas_user }}"
+    - exp: "^port"
+      value: "port={{ piaas_port }}"
+  notify:
+    - Restart mini-httpd
+
+
+- name: Copy cli scripts
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/usr/sbin/{{ item }}"
+    owner: root
+    group: root
+    mode: '0744'
+  loop:
+    - piaas_image
+    - piaas_instance
+
+- name: copy traeffic configuration
+  ansible.builtin.template:
+    src: traefik.j2
+    dest: "/home/{{ piaas_user }}/traefik.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart traefik
+
+- name: Create traeffic certs docker volume
+  community.docker.docker_volume:
+    name: traefik_certs
+
+- name: Install traefik container
+  community.general.docker_container:
+    name: "traefik"
+    image: "traefik:v2.10"
+    restart_policy: unless-stopped
+    published_ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/home/{{ piaas_user }}/traefik.yml:/etc/traefik/traefik.yml"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - traefik_certs:/certs
+
+- name: Create guacamole config docker volume
+  community.docker.docker_volume:
+    name: guac_config
+
+- name: Install guacamole with docker
+  community.docker.docker_container:
+    name: guacamole
+    image: flcontainers/guacamole
+    restart_policy: unless-stopped
+    volumes:
+      - guac_config:/config
+    env:
+      EXTENSIONS: "auth-quickconnect,auth-openid"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.guacamole.rule: "Host(`guacamole.{{ piaas_external_fqdn }}`)"
+      traefik.http.routers.guacamole.entrypoints: "websecure"
+      traefik.http.routers.guacamole.tls: "true"
+      traefik.http.routers.guacamole.tls.certresolver: "epicresolver"
+      traefik.http.routers.guacamole.service: "guacamoleService"
+      traefik.http.services.guacamoleService.loadBalancer.server.port: "8080"
+
+- name: copy web-ui prototype script
+  ansible.builtin.copy:
+    src: "{{ item.src}}" 
+    dest: "{{ item.dest }}"
+    mode: "{{ item.mode }}"
+    owner: epic
+    group: epic
+  loop:
+   - src: index.html
+     dest: /var/www/html/
+     mode: '0644'
+   - src: piaas.cgi
+     dest: /var/www/html/cgi-bin/
+     mode: '0755'
+
+#- name: Create uptime-kuma docker volume
+#  community.docker.docker_volume:
+#    name: kuma-data
+#
+#- name: Install uptime-kuma with docker
+#  community.docker.docker_container:
+#    name: uptime-kuma
+#    image: louislam/uptime-kuma:1
+#    restart_policy: unless-stopped
+#    volumes:
+#      - "/var/run/docker.sock:/var/run/docker.sock"
+#      - kuma-data:/app/data
+#    labels:
+#      traefik.enable: "true"
+#      traefik.http.routers.uptime-kuma.rule: "Host(`uptime-kuma.einfachit.ipv64.net`)"
+#      traefik.http.routers.uptime-kuma.entrypoints: "websecure"
+#      traefik.http.routers.uptime-kuma.tls: "true"
+#      traefik.http.routers.uptime-kuma.tls.certresolver: "epicresolver"
+#        #traefik.http.services.uptime-kuma.loadbalancer.server.port: "3001"
+#
+#- name: Create ntfy cache docker volume
+#  community.docker.docker_volume:
+#    name: ntfy-cache
+#
+#- name: Install ntfy with docker
+#  community.docker.docker_container:
+#    name: ntfy
+#    image: binwiederhier/ntfy
+#    command: serve --cache-file /var/cache/ntfy/cache.db
+#    restart_policy: unless-stopped
+#    labels:
+#      traefik.enable: "true"
+#      traefik.http.routers.ntfy.rule: "Host(`ntfy.einfachit.ipv64.net`)"
+#      traefik.http.routers.ntfy.entrypoints: "websecure"
+#      traefik.http.routers.ntfy.tls: "true"
+#      traefik.http.routers.ntfy.tls.certresolver: "epicresolver"
+#    env:
+#      NTFY_BEHIND_PROXY: "true"
+#    volumes:
+#      - ntfy-cache:/var/cache/ntfy
+#
+#- name: Create syncthing data volume
+#  community.docker.docker_volume:
+#    name: syncthing_data
+#
+#- name: Install syncthing container
+#  community.docker.docker_container:
+#    name: syncthing
+#    image: syncthing/syncthing
+#    restart_policy: unless-stopped
+#    labels:
+#      traefik.enable: "true"
+#      traefik.http.routers.syncthing.rule: "Host(`syncthing.einfachit.ipv64.net`)"
+#      traefik.http.routers.syncthing.entrypoints: "websecure"
+#      traefik.http.routers.syncthing.tls: "true"
+#      traefik.http.routers.syncthing.tls.certresolver: "epicresolver"
+#      #- traefik.http.routers.syncthing.tls.domains[0].main: myserver.net
+#      #- traefik.http.routers.syncthing.tls.domains[0].sans: *.myserver.net
+#      traefik.http.services.syncthingService.loadbalancer.server.port: "8384"
+#      traefik.http.routers.syncthing.middlewares: "auth@file"
+#    env:
+#      PUID: "1000"
+#      PGID: "1000"
+#    published_ports:
+#      - "22000:22000"
+#      - "21027:21027/udp"
+#    volumes:
+#      - syncthing_data:/var/syncthing
+

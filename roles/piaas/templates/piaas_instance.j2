@@ -1,0 +1,171 @@
+#!/bin/bash
+
+set -e
+
+function lineinfile() { line=${2//\//\\/} ; sed -i -e '/'"${1//\//\\/}"'/{s/.*/'"${line}"'/;:a;n;ba;q};$a'"${line}" "$3" ; }
+
+function create() {
+  declare -A args=(
+    ["name"]=""
+    ["image"]=""
+  )
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name|-n)
+        args["name"]="$2"
+        shift 2
+        ;;
+      --image|-i)
+        args["image"]="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  if [ ! -d {{ piaas_nfs_root }}/${args["name"]} ]; then
+    mkdir {{ piaas_nfs_root }}/${args["name"]}
+    #rsync -a {{ piaas_images_root }}/${args["image"]}/ {{ piaas_nfs_root }}/${args["name"]}
+    mkdir {{ piaas_nfs_root }}/upper/${args["name"]}
+    mkdir {{ piaas_nfs_root }}/work/${args["name"]}
+    lineinfile "{{ piaas_nfs_root }}/${args['name']} " "overlay  {{ piaas_nfs_root }}/${args['name']} overlay noauto,x-systemd.automount,nfs_export=on,index=on,lowerdir={{ piaas_images_root }}/${args['image']},upperdir={{ piaas_nfs_root }}/upper/${args['name']},workdir={{ piaas_nfs_root }}/work/${args['name']} 0 0" /etc/fstab
+    systemctl daemon-reload
+    sudo mount {{ piaas_nfs_root }}/${args["name"]}
+
+    echo > {{ piaas_nfs_root }}/${args["name"]}/etc/fstab
+    echo "proc /proc proc defaults 0 0" >> {{ piaas_nfs_root }}/${args["name"]}/etc/fstab
+    echo "{{ piaas_ip_address }}:{{ piaas_nfs_root }}/${args["name"]}/boot/firmware /boot/firmware nfs defaults,vers=4.1,proto=tcp 0 0" >>  {{ piaas_nfs_root }}/${args["name"]}/etc/fstab
+
+    echo "console=serial0,115200 console=tty1 root=/dev/nfs nfsroot={{ piaas_ip_address }}:{{ piaas_nfs_root }}/${args["name"]},vers=3 rw ip=dhcp rootwait quite init=/usr/lib/raspberrypi-sys-mods/firstboot" >  {{ piaas_nfs_root }}/${args["name"]}/boot/firmware/cmdline.txt
+    rm  {{ piaas_nfs_root }}/${args["name"]}/etc/init.d/resize2fs_once
+    sed "s/hostname =.*/hostname = \"${args["name"]}\"/g"  {{ piaas_config_root }}/custom.toml >  {{ piaas_nfs_root }}/${args["name"]}/boot/firmware/custom.toml
+
+    # add instance to be exported via nfs
+    lineinfile "{{ piaas_nfs_root }}/${args['name']} " "{{ piaas_nfs_root }}/${args['name']} *(rw,sync,no_root_squash)" /etc/exports
+    service  nfs-kernel-server restart
+
+    # copy enable vnc script
+    cp {{ piaas_config_root }}/enable_vnc_access.sh {{ piaas_nfs_root }}/${args['name']}/usr/sbin/
+
+  else
+    echo instance with name ${args["name"]} already exists
+  fi
+
+}
+
+
+function delete(){
+  declare -A args=(
+    ["name"]=""
+  )
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name|-n)
+        args["name"]="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  # add check if instance is linked/running
+  # for file in $(find /data/tftpboot/ -type l); do  readlink  "$file"; done
+  if [ -d {{ piaas_nfs_root }}/${args["name"]} ]; then
+    sed -i "\|{{ piaas_nfs_root }}/${args['name']}[ \t]|d" /etc/exports
+    service nfs-kernel-server restart
+    umount  {{ piaas_nfs_root }}/${args["name"]}
+    sed -i "\|{{ piaas_nfs_root }}/${args['name']} |d" /etc/fstab
+    systemctl daemon-reload
+    rm -rf {{ piaas_nfs_root }}/${args["name"]}
+    rm -rf {{ piaas_nfs_root }}/upper/${args["name"]}
+    rm -rf {{ piaas_nfs_root }}/work/${args["name"]}
+  else
+    echo instance with name ${args["name"]} does not exists
+  fi
+}
+
+function assign_node() {
+  declare -A args=(
+    ["instance_name"]=""
+    ["node_serial"]=""
+  )
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --instance_name|-n)
+        args["name"]="$2"
+        shift 2
+        ;;
+      --node_serial|-s)
+        args["serial"]="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+  boot_dir=$(find -L {{ piaas_tftp_root }}/ -samefile {{ piaas_nfs_root }}/${args["name"]}/boot/firmware/)
+  if [ -z "$boot_dir" ]; then
+    ln -s {{ piaas_nfs_root }}/${args["name"]}/boot/firmware {{ piaas_tftp_root }}/${args["serial"]}
+  fi
+}
+
+
+function unassign_node() {
+  declare -A args=(
+    ["node_serial"]=""
+  )
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --node_serial|-s)
+        args["serial"]="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  rm {{ piaas_tftp_root }}/${args["serial"]}
+}
+
+function get_assigned_node() {
+  declare -A args=(
+    ["name"]=""
+  )
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name|-n)
+        args["serial"]="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  basename $(find -L /data/tftpboot/ -samefile /data/nfs/${args["name"]}/boot/firmware)
+}
+
+if [[ "$1" != "_"* ]]; then
+  "$@"
+else
+  echo "Unknown subcommand: $1"
+fi
+
