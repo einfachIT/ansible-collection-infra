@@ -1,0 +1,68 @@
+---
+
+- name: Install needed packages
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: true
+  loop:
+    - dnsmasq
+
+
+- name: Configure static IP for eth0
+  community.general.nmcli:
+    conn_name: eth0
+    type: ethernet
+    ip4: "{{ wifi_bridge_eth0_ip }}/24"
+    state: present
+  notify:
+    - Reapply eth0 config
+
+- name: Configure dnsmasq
+  ansible.builtin.lineinfile:
+    path: /etc/dnsmasq.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - regexp: "^interface="
+      line: "interface=eth0"
+    - regexp: "^dhcp-range="
+      line: "dhcp-range={{ wifi_bridge_dhcp_range }}"
+    - regexp: "^bogus-priv"
+      line: "bogus-priv"
+    - regexp: "^domain-needed"
+      line: "domain-needed"
+
+  notify: Setup dnsmasq service
+
+
+- name: Configure ip forwarding
+  ansible.builtin.lineinfile:
+    dest: /etc/sysctl.conf
+    regexp: "^net.ipv4.ip_forward"
+    line: "net.ipv4.ip_forward=1"
+  notify:
+
+
+- name: setup iptables
+  ansible.builtin.iptables:
+    table: nat
+    chain: POSTROUTING
+    out_interface: wlan0
+    jump: "MASQUERADE"
+
+
+- name: setup iptables 
+  ansible.builtin.iptables:
+    chain: FORWARD
+    in_interface: wlan0
+    out_interface: eth0
+    ctstate: ESTABLISHED,RELATED
+    jump: "ACCEPT"
+
+- name: setup iptables 
+  ansible.builtin.iptables:
+    chain: FORWARD
+    in_interface: eth0
+    out_interface: wlan0
+    jump: "ACCEPT"

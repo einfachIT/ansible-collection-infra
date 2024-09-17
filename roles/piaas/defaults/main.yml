@@ -1,0 +1,11 @@
+---
+# defaults file for pia
+piaas_user: "{{ ansible_user }}"
+piaas_ip_address: "{{ ansible_default_ipv4.address }}"
+piaas_data_dir: "/data"
+piaas_tftp_root: "{{ piaas_data_dir }}/tftpboot"
+piaas_nfs_root: "{{ piaas_data_dir }}/nfs"
+piaas_images_root: "{{ piaas_data_dir }}/images"
+piaas_config_root: "~/"
+piaas_port: "9000"
+piaas_external_fqdn: "{{ ansible_host }}"

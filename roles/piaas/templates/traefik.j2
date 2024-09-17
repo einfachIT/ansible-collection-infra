@@ -1,0 +1,73 @@
+ping: {}
+
+providers:
+  docker:
+    exposedByDefault: false
+  file:
+    filename: /etc/traefik/traefik.yml
+
+api:
+  insecure: true
+  dashboard: true
+
+# listen on 80/443, and redirect all 80 to 443 via 301
+entryPoints:
+  web:
+    address: :80
+    # comment out these lins if you don't want to redirect everything
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: :443
+
+certificatesResolvers:
+  epicresolver:
+    acme:
+      # caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+      email: "bastian.greuel@gmail.com"
+      storage: "/certs/acme.json"
+      httpChallenge:
+        # used during the challenge
+        entryPoint: web
+
+# Writing Logs to a File
+log:
+  filePath: "/var/log/traefik.log"
+
+
+accesslog:
+  filePath: "/var/log/access.log"
+
+http:
+  services:
+    piaas:
+      loadBalancer:
+        servers:
+        - url: "http://{{ ansible_default_ipv4.address }}:{{ piaas_port }}/"
+  routers:
+    piaas:
+      rule: Host(`piaas.{{ piaas_external_fqdn }}`)
+      service: piaas
+      entrypoints: "websecure"
+      tls:
+        certresolver: "epicresolver"
+      middlewares:
+        - auth
+    dashboard:
+      rule: Host(`{{ piaas_external_fqdn }}`) && (PathPrefix(`/api/`) || PathPrefix(`/dashboard/`))
+      service: api@internal
+      entrypoints: "websecure"
+      tls:
+        certresolver: "epicresolver"
+      middlewares:
+        - auth
+  middlewares:
+    auth:
+      basicAuth:
+        users:
+          - "admin:$apr1$.R3sPsH1$r65UmltVLdeOcywKCI5Ny/"
+          - "epic:$apr1$BsVXdMBC$8ZJckKORv./GOkFqA/NC2/"

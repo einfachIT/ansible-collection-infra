@@ -21,21 +21,30 @@
     - "{{ netboot_server_nfs_root }}/upper"
     - "{{ netboot_server_nfs_root }}/work"
     - "{{ netboot_server_tftp_root }}"
+    - "{{ netboot_server_images_root }}"
 
 
 - name: Flush handlers
   ansible.builtin.meta: flush_handlers
 
-- name: Configure dnsmask
-  ansible.builtin.copy:
-    dest: /etc/dnsmasq.conf
-    content: |
-      interface=eth0
-      dhcp-range={{ netboot_server_dhcp_range }}
-      log-dhcp
-      enable-tftp
-      tftp-root={{ netboot_server_tftp_root }}
-      pxe-service=0,"Raspberry Pi Boot"
+- name: Configure dnsmasq
+  ansible.builtin.lineinfile:
+    path: /etc/dnsmasq.conf
+    regexp: "{{ item.regexp }}" 
+    line: "{{ item.line }}"
+  loop:
+    - regexp: "^interface="
+      line: "interface=eth0"
+    - regexp: "^dhcp-range="
+      line: "dhcp-range={{ netboot_server_dhcp_range }}"
+    - regexp: "^log-dhcp"
+      line: "log-dhcp"
+    - regexp: "^enable-tftp"
+      line: "enable-tftp"
+    - regexp: "^tftp-root="
+      line: "tftp-root={{ netboot_server_tftp_root }}"
+    - regexp: "^pxe-service="
+      line: 'pxe-service=0,"Raspberry Pi Boot"'
   notify:
     - Setup dnsmasq service
 
@@ -50,18 +59,13 @@
     - Restart rpcbind
     - Restart nfs server
 
-- name: Copy cli scripts
-  ansible.builtin.template:
-    src: "{{ item }}.j2"
-    dest: "/usr/sbin/{{ item }}"
-    owner: root
-    group: root
-    mode: '0744'
-  loop:
-    - piaas_image
-    - piaas_instance
-
 - name: Copy default custom.toml
   ansible.builtin.copy:
     src: "custom.toml"
     dest: "{{ netboot_server_config_root }}"
+
+- name: copy vnc script
+  ansible.builtin.copy:
+    src: "enable_vnc_access.sh"
+    dest: "{{ netboot_server_config_root }}"
+    mode: 0744
