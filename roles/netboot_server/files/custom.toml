@@ -27,7 +27,7 @@ password_encrypted = true
 [ssh]
 # ssh_import_id = "gh:user" # import public keys from github
 enabled = true
-password_authentication = false
+password_authentication = true
 # We can also seed the ssh public keys configured for the default user:
 # authorized_keys = [ "ssh-rsa ... user@host", ... ]
 authorized_keys = [ "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDRSywKgwQe33PAu1REyP5N0DR1qkiQTZdCU0rorDi4NnjJb6StSG1c7szQfakTlsjpzdKMifBpKUs8DU+4/ttv3qKvsTTCB8RrCtnXVkFv6m8Qfxao2WM68iVplRU/f7stblThR5Kq3dKgYVsHHkf8upsgS85QmR72XbyE/0ZCsCoOanqzm+HiBD5n/hUVceDHj6Zb2hbbm0L5t8JPc8MynwO5qsCwC+DGC8F13gAQ9UjnlkCNc2rqyd7kJOh660gp2Gv6X8Uhn+EuHr7C8+Gc+DpCZICtoA9munFJkJfv3zpJGNliQqxk4px3uvs/mBEcoiFCOnnct5MNp+6FwUGp" ]
@@ -41,7 +41,8 @@ authorized_keys = [ "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDRSywKgwQe33PAu1REyP5
 ## Reference: https://wireless.wiki.kernel.org/en/developers/Regulatory
 #country = "IE"
 
-[locale]
-keymap = "de_CH"
-timezone = "Europe/Zurich"
+#This does not work with wayvnc (no keyboard input possible)
+#[locale]
+#keymap = "de_CH"
+#timezone = "Europe/Zurich"
 
