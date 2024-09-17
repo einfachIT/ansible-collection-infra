@@ -14,8 +14,8 @@ galaxy_info:
   platforms:
     - name: Debian
       release:
-        - 'bullseye'
+        - 'bookworm'
 
-  galaxy_tags: [raspberry, ceph]
+  galaxy_tags: [raspberry]
 
 dependencies: []
