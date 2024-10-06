@@ -33,8 +33,6 @@
     regexp: "{{ item.regexp }}" 
     line: "{{ item.line }}"
   loop:
-    - regexp: "^interface="
-      line: "interface=eth0"
     - regexp: "^dhcp-range="
       line: "dhcp-range={{ netboot_server_dhcp_range }}"
     - regexp: "^log-dhcp"
