@@ -9,3 +9,9 @@
 - name: Reapply eth0 config
   ansible.builtin.command:
     cmd: "nmcli device reapply eth0" 
+
+- name: Persist iptables
+  ansible.builtin.shell: iptables-save > /etc/iptables/rules.v4
+
+- name: Renew dhcp lease
+  ansible.builtin.shell: "dhclient -r; dhclient"
