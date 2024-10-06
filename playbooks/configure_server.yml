@@ -7,8 +7,13 @@
 
   - name: Setup netboot server
     include_role:
-      name: "einfachit.hpc.netboot_server"
+      name: "einfachit.piaas.netboot_server"
+
+  - name: Setup netboot server
+    include_role:
+      name: "einfachit.piaas.wifi_bridge"
+
 
   - name: Setup piaas service
     include_role:
-      name: "einfachit.hpc.piaas"
+      name: "einfachit.piaas.webui"
