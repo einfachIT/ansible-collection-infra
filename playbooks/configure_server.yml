@@ -1,5 +1,15 @@
 ---
-- name: Configure netboot server
+- name: setup wifi bridge
+  hosts: wifi_bridge
+  become: true
+  gather_facts: true
+  tasks:
+
+  - name: Configure network bridge
+    include_role:
+      name: "einfachit.piaas.wifi_bridge"
+
+- name: Configure piaas server
   hosts: netboot_server
   become: true
   gather_facts: true
@@ -9,11 +19,10 @@
     include_role:
       name: "einfachit.piaas.netboot_server"
 
-  - name: Setup netboot server
-    include_role:
-      name: "einfachit.piaas.wifi_bridge"
-
-
   - name: Setup piaas service
+    include_role:
+      name: "einfachit.piaas.cli"
+
+  - name: Setup piaas webui 
     include_role:
       name: "einfachit.piaas.webui"

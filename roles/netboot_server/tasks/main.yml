@@ -56,14 +56,3 @@
   notify:
     - Restart rpcbind
     - Restart nfs server
-
-- name: Copy default custom.toml
-  ansible.builtin.copy:
-    src: "custom.toml"
-    dest: "{{ netboot_server_config_root }}"
-
-- name: copy vnc script
-  ansible.builtin.copy:
-    src: "enable_vnc_access.sh"
-    dest: "{{ netboot_server_config_root }}"
-    mode: 0744

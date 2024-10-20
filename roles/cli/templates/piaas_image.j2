@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+set -e
+
+
+function install() {
+  declare -A args=(
+    ["name"]=""
+    ["url"]=""
+  )
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name|-n)
+        args["name"]="$2"
+        shift 2
+        ;;
+      --url|-u)
+        args["url"]="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  if [ ! -d {{ piaas_images_root }}/${args["name"]} ]; then
+    curl ${args["url"]} -o  {{ piaas_images_root }}/${args["name"]}.img.xz
+    cd {{ piaas_images_root }}
+    unxz ${args["name"]}.img.xz
+    mkdir {{ piaas_images_root }}/${args["name"]}
+    mkdir /mnt/${args["name"]}
+    losetup -P /dev/loop0 {{ piaas_images_root }}/${args["name"]}.img
+    mount -o ro -t ext4 /dev/loop0p2 /mnt/${args["name"]}
+    mount -o ro -t vfat /dev/loop0p1 /mnt/${args["name"]}/boot/firmware
+    rsync -a /mnt/${args["name"]}/ {{ piaas_images_root }}/${args["name"]}
+    sudo umount /mnt/${args["name"]}/boot/firmware
+    sudo umount /mnt/${args["name"]}
+    sudo losetup -d /dev/loop0
+    rm -rf /mnt/${args["name"]}
+    rm ${args["name"]}.img
+  else
+    echo image with name ${args["name"]} already exists
+  fi
+}
+
+if [[ "$1" != "_"* ]]; then
+  "$@"
+else
+  echo "Unknown subcommand: $1"
+fi

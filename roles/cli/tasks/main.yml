@@ -1,0 +1,47 @@
+---
+
+- name: Install needed packages
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: true
+  loop:
+    - rsync
+    - snmp
+
+- name: Copy cli scripts
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/usr/sbin/{{ item }}"
+    owner: root
+    group: root
+    mode: '0744'
+  loop:
+    - piaas_image
+    - piaas_instance
+    - piaas_node
+
+- name: Create nfs export config directory
+  ansible.builtin.file:
+    path: "{{ piaas_config_root }}/exports.d/"
+    state: directory
+    recurse: yes
+    mode: '0755'
+
+- name: Link nfs export config directory
+  ansible.builtin.file:
+    dest: /etc/exports.d
+    src: "{{ piaas_config_root }}/exports.d/"
+    state: link
+
+- name: Copy default custom.toml
+  ansible.builtin.copy:
+    src: "custom.toml"
+    dest: "{{ piaas_config_root }}"
+
+- name: copy vnc script
+  ansible.builtin.copy:
+    src: "enable_vnc_access.sh"
+    dest: "{{ piaas_config_root }}"
+    mode: 0744
+

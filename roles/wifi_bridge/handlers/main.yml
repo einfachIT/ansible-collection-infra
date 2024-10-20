@@ -1,12 +1,11 @@
 ---
 
-- name: Setup dnsmasq service
+- name: Restart dnsmasq service
   ansible.builtin.service:
     name: dnsmasq
     state: restarted
-    enabled: true
 
-- name: Reapply eth0 config
+- name: Reapply lan config
   ansible.builtin.command:
     cmd: "nmcli device reapply eth0" 
 

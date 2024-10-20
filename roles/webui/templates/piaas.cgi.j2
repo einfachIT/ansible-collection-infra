@@ -1,0 +1,299 @@
+#!/bin/bash
+
+echo "Content-type: text/html"
+echo ""
+
+echo '<html>'
+cat <<EOF
+<style>
+header {
+  background-color: #666;
+  padding: 5px;
+  text-align: center;
+  font-size: 25px;
+  color: white;
+}
+
+h1 {
+  text-align: center;
+}
+
+table, th, td {
+  border: 1px solid black;
+  border-collapse: collapse;
+  padding: 5px;
+}
+
+table {
+  margin-left: auto;
+  margin-right: auto
+}
+
+select{
+ width:100px;   
+}
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px dotted black;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 120px;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px 0;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -60px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.tooltip .tooltiptext::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #555 transparent transparent transparent;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+  opacity: 1;
+}
+</style>
+EOF
+
+if [ ! -z "$QUERY_STRING" ]; then
+  # No looping this time, just extract the data you are looking for with sed:
+  INSTANCE=`echo "$QUERY_STRING" | sed -n 's/^.*instance=\([^&]*\).*$/\1/p' | sed "s/%20/ /g"`
+  IMAGE=`echo "$QUERY_STRING" | sed -n 's/^.*image=\([^&]*\).*$/\1/p' | sed "s/%20/ /g"`
+  SERIAL=`echo "$QUERY_STRING" | sed -n 's/^.*serial=\([^&]*\).*$/\1/p' | sed "s/%20/ /g"`
+  ACTION=`echo "$QUERY_STRING" | sed -n 's/^.*action=\([^&]*\).*$/\1/p' | sed "s/%20/ /g"`
+  case $ACTION in
+    shelv)
+    source {{ piaas_config_root }}/nodes/$SERIAL
+    $PWR_OFF_CMD 1>/dev/null 
+    sudo piaas_instance unassign_node -s $SERIAL
+    ;;
+    unshelv)
+    source {{piaas_config_root }}/nodes/$SERIAL
+    sudo piaas_instance assign_node -n $INSTANCE -s $SERIAL
+    $PWR_ON_CMD 1>/dev/null
+    ;;
+    reset)
+    source {{ piaas_config_root }}/nodes/$SERIAL
+    echo factory reset instance $INSTANCE
+    echo '<br>'
+    sudo piaas_instance delete --name $INSTANCE
+    sudo piaas_instance create --name $INSTANCE --image $IMAGE
+    ;;
+    pwr_on)
+    echo poweron instance running on raspberry pi with serial number $SERIAL
+    echo '<br>'
+    source {{ piaas_config_root }}/nodes/$SERIAL
+    echo '<br>'
+    echo running: $PWR_ON_CMD
+    echo '<br>'
+    $PWR_ON_CMD
+    ;;
+    pwr_off)
+    echo poweroff instance running on raspberry pi with serial number $SERIAL
+    echo '<br>'
+    source {{ piaas_config_root }}/nodes/$SERIAL
+    echo '<br>'
+    echo running: $PWR_OFF_CMD
+    echo '<br>'
+    $PWR_OFF_CMD
+    ;;
+    pwr_state)
+    echo get power state of instance running on raspberry pi with serial number $SERIAL INTEGER: 1 = on INTEGER: 2 = off
+    echo '<br>'
+    source {{ piaas_config_root }}/nodes/$SERIAL
+    echo '<br>'
+    echo running: $PWR_GET_CMD
+    echo '<br>'
+    $PWR_GET_CMD
+    ;;
+    delete)
+    sudo piaas_instance delete --name $INSTANCE
+    ;;
+    create)
+    sudo piaas_instance create --name $INSTANCE --image $IMAGE
+    ;;
+    assign)
+    sudo piaas_instance assign_node -n $INSTANCE -s $SERIAL
+    ;;
+    unassign)
+    sudo piaas_instance unassign_node -s $SERIAL
+    ;;
+    assignment)
+    basename $(find -L /data/tftpboot/ -samefile /data/nfs/${INSTANCE}/boot/firmware)
+    ;;
+    unassigned)
+    diff <(ls /data/tftpboot/) <(ls {{ piaas_config_root }}/nodes/) | grep -e '^>' | cut -d " " -f2
+    ;;
+  esac
+fi
+
+
+echo '<head>'
+echo '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
+echo '<title>Form Example</title>'
+echo '</head>'
+echo '<body>'
+
+#cat <<EOF
+#  <script>
+#  setTimeout(function(){
+#      window.location.replace(location.pathname);
+#  }, 30000); // 20 seconds</script>
+#EOF
+
+echo '<header> <h2>PIaaS Web UI</h2> </header>'
+echo '<h1>Instances</h1>'
+ echo '<table> <tr> <th>Name</th> <th>Image</th> <th>Serial</th> <th>Power</th> <th>Ping</th> <th>SSH</th> <th>VNC</th> <th>Action</th> <th></th> </tr>'
+  for instance in $(ls /data/nfs/ | grep -v -e 'upper\|work\|.*bak');
+  do echo '<tr>'
+    echo '<form action="">'
+    echo '<td>'
+      echo "<input type="hidden" id="instanceName" name="instance" value="$instance">"
+      echo "$instance"
+    echo '</td>'
+    echo '<td>'
+      image=$(grep " /data/nfs/$instance " {{ piaas_config_root }}/fstab | grep -oP "(?:^|,)lowerdir=\K[^,]+" | xargs basename)
+      echo "$image"
+      echo "<input type="hidden" id="imageName" name="image" value="$image">"
+    echo '</td>'
+    boot_dir=$(find -L /data/tftpboot/ -samefile /data/nfs/${instance}/boot/firmware)
+    if [ ! -z "$boot_dir" ]
+    then
+      echo '<td>'
+      serial=$(basename $boot_dir)
+      source {{ piaas_config_root }}/nodes/$serial
+      echo '<div class="tooltip">'
+      echo "<input type="hidden" id="nodeSerial" name="serial" value="$serial">"
+      echo $NODEINFO
+      echo "<span class="tooltiptext">$serial</span>"
+      echo '</div>'
+      echo '</td>'
+      echo '<td>'
+      pwr_state=$($PWR_GET_CMD)
+      if [[ ${pwr_state: -1} == "1" ]]; then
+        echo on 
+      else
+        echo off
+      fi
+      echo '</td>'
+      echo '<td>'
+        ping -qc1 $instance 2>/dev/null | awk -F'/' 'END{ print (/^rtt/? "OK "$5" ms":"FAIL") }'
+      echo '</td>'
+
+      echo '<td>'
+        nmap $instance -PN -p ssh 2>/dev/null | grep -E 'open|filtered'
+      echo '</td>'
+
+      echo '<td>'
+        nmap $instance -PN -p vnc 2>/dev/null | grep -E 'open|filtered'
+      echo '</td>'
+    else
+      echo '<td>'
+      echo '<select id="serial" name="serial">'
+      nodes=$(diff <(ls /data/tftpboot/) <(ls {{piaas_config_root }}/nodes/) | grep -e '^>' | cut -d " " -f2)
+      for node in $nodes;
+      do
+        source {{ piaas_config_root }}/nodes/$node
+        echo "<option title="$node" value="$node">$NODEINFO</option>"
+      done
+      echo '</select>'
+      echo '</td>'
+      echo '<td>'
+      echo '</td>'
+      echo '<td>'
+      echo '</td>'
+      echo '<td>'
+      echo '</td>'
+      echo '<td>'
+      echo '</td>'
+    fi
+   
+    echo '<td>'
+    echo '<select id="action" name="action">'
+    echo '<option value=""></option>'
+    if [ ! -z "$boot_dir" ]
+    then
+      echo '<option value="shelv">stop</option>'
+    elif [ ! -z "$nodes" ]
+    then
+      echo '<option value="unshelv">start</option>'
+      echo '<option value="reset">factory reset</option>'
+      echo '<option value="delete">delete</option>'
+    fi
+    echo '</select>'
+    echo '<td>'
+    echo '<input type="submit" value="Submit">'
+    echo '</td>'
+    echo '</form>'
+    echo '</tr>'
+  done
+    echo '<tr>'
+    echo '<form action="">'
+     echo '<td>'
+       echo '<input type="text" id="instanceNAme" name="instance" >'
+     echo '</td>'
+     echo '<td>'
+     echo '<select style="width: 250px;" id="image" name="image">'
+       images=$(ls /data/images)
+       for image in $images;
+       do
+         echo "<option value="$image">$image</option>"
+       done
+     echo '</select>'
+     echo '</td>'
+     echo '<td>'
+       #echo '<select id="serial" name="serial">'
+       #nodes=$(diff <(ls /data/tftpboot/) <(ls {{ piaas_config_root }}/nodes/) | grep -e '^>' | cut -d " " -f2)
+       #for node in $nodes;
+       #do
+       #  source {{ piaas_config_root }}/nodes/$node
+       #  echo "<option title="$node" value="$node">$NODEINFO</option>"
+       #done
+     echo '</td>'
+     echo '<td>'
+     echo '</td>'
+     echo '<td>'
+     echo '</td>'
+     echo '<td>'
+     echo '</td>'
+     echo '<td>'
+     echo '</td>'
+     echo '<td>'
+       echo '<select id="action" name="action">'
+       echo '<option value=""></option>'
+       echo '<option value="create">create</option>'
+       echo '</select>'
+     echo '</td>'
+     echo '<td>'
+       echo '<input type="submit" value="Submit">'
+     echo '</td>'
+    echo '</form>'
+    echo '</tr>'
+  echo '</table>'
+
+echo '<a href="?">Reload</a>'
+
+echo '</body>'
+echo '</html>'
+
+exit 0
+

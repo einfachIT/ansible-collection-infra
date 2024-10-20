@@ -4,7 +4,7 @@
   ansible.builtin.service:
     name: mini-httpd
     state: restarted
-    enabled: true
+    enabled: yes
 
 - name: Restart traefik
   docker_container:

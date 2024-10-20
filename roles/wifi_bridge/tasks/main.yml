@@ -10,14 +10,14 @@
     - iptables-persistent
 
 
-- name: Configure static IP for eth0
+- name: Configure static IP for lan device
   community.general.nmcli:
-    conn_name: eth0
+    conn_name: "{{ wifi_bridge_lan_dev }}"
     type: ethernet
-    ip4: "{{ wifi_bridge_eth0_ip }}/24"
+    ip4: "{{ wifi_bridge_lan_ip }}/24"
     state: present
   notify:
-    - Reapply eth0 config
+    - Reapply lan config
 
 - name: Configure dnsmasq
   ansible.builtin.lineinfile:
@@ -26,14 +26,14 @@
     line: "{{ item.line }}"
   loop:
     - regexp: "^no-dhcp-interface="
-      line: "no-dhcp-interface=wlan0"
+      line: "no-dhcp-interface={{ wifi_bridge_external_dev }}"
     - regexp: "^dhcp-range="
       line: "dhcp-range={{ wifi_bridge_dhcp_range }}"
     - regexp: "^bogus-priv"
       line: "bogus-priv"
     - regexp: "^domain-needed"
       line: "domain-needed"
-  notify: Setup dnsmasq service
+  notify: Restart dnsmasq service
 
 - name: Add localhost dns
   ansible.builtin.lineinfile:
@@ -54,7 +54,7 @@
   ansible.builtin.iptables:
     table: nat
     chain: POSTROUTING
-    out_interface: wlan0
+    out_interface: "{{ wifi_bridge_external_dev }}"
     jump: "MASQUERADE"
   notify: Persist iptables
 
@@ -62,8 +62,8 @@
 - name: setup iptables 
   ansible.builtin.iptables:
     chain: FORWARD
-    in_interface: wlan0
-    out_interface: eth0
+    in_interface: "{{ wifi_bridge_external_dev }}"
+    out_interface: "{{ wifi_bridge_lan_dev }}"
     ctstate: ESTABLISHED,RELATED
     jump: "ACCEPT"
   notify: Persist iptables
@@ -71,7 +71,13 @@
 - name: setup iptables 
   ansible.builtin.iptables:
     chain: FORWARD
-    in_interface: eth0
-    out_interface: wlan0
+    in_interface: "{{ wifi_bridge_lan_dev }}"
+    out_interface: "{{ wifi_bridge_external_dev }}"
     jump: "ACCEPT"
   notify: Persist iptables
+
+- name: Start dnsmasq service
+  ansible.builtin.service:
+    name: dnsmasq
+    state: started
+    enabled: true

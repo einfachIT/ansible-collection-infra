@@ -6,7 +6,6 @@
     state: present
     update_cache: true
   loop:
-    - rsync
     - mini-httpd
     - snmp
 
@@ -25,19 +24,31 @@
   notify:
     - Restart mini-httpd
 
+- name: copy web-ui redirect page
+  ansible.builtin.copy:
+    src: "index.html" 
+    dest: "/var/www/html"
+    mode: '06444'
+    owner: "{{ piaas_user }}"
+    group: "{{ piaas_user }}"
+ 
+- name: Create cgi-bin directory
+  ansible.builtin.file:
+    path: "/var/www/html/cgi-bin"
+    state: directory
+    owner: "{{ piaas_user }}"
+    group: "{{ piaas_user }}"
+    mode: '0755'
 
-- name: Copy cli scripts
+- name: copy web-ui prototype script
   ansible.builtin.template:
-    src: "{{ item }}.j2"
-    dest: "/usr/sbin/{{ item }}"
-    owner: root
-    group: root
-    mode: '0744'
-  loop:
-    - piaas_image
-    - piaas_instance
+    src: "piaas.cgi.j2"
+    dest: "/var/www/html/cgi-bin/piaas.cgi"
+    mode: '0755'
+    owner: "{{ piaas_user }}"
+    group: "{{ piaas_user }}"
 
-- name: copy traeffic configuration
+- name: copy traefic configuration
   ansible.builtin.template:
     src: traefik.j2
     dest: "/home/{{ piaas_user }}/traefik.yml"
@@ -86,20 +97,6 @@
       traefik.http.routers.guacamole.service: "guacamoleService"
       traefik.http.services.guacamoleService.loadBalancer.server.port: "8080"
 
-- name: copy web-ui prototype script
-  ansible.builtin.copy:
-    src: "{{ item.src}}" 
-    dest: "{{ item.dest }}"
-    mode: "{{ item.mode }}"
-    owner: epic
-    group: epic
-  loop:
-   - src: index.html
-     dest: /var/www/html/
-     mode: '0644'
-   - src: piaas.cgi
-     dest: /var/www/html/cgi-bin/
-     mode: '0755'
 
 #- name: Create uptime-kuma docker volume
 #  community.docker.docker_volume:

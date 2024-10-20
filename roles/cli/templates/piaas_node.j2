@@ -1,0 +1,140 @@
+#!/bin/bash
+
+set -e
+
+function lineinfile() { line=${2//\//\\/} ; sed -i -e '/'"${1//\//\\/}"'/{s/.*/'"${line}"'/;:a;n;ba;q};$a'"${line}" "$3" ; }
+
+function add() {
+  declare -A args=(
+    ["name"]=""
+    ["serial"]=""
+  )
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name|-n)
+        args["name"]="$2"
+        shift 2
+        ;;
+      --serial|-s)
+        args["serial"]="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+  if [ ! -f {{ piaas_config_root }}/nodes/${args["serial"]} ]; then
+    echo NODEINFO=\"${args["name"]}\" > {{ piaas_config_root }}/nodes/${args["serial"]}
+  else
+    echo "node with serial ${args["serial"]} already exists"
+  fi
+}
+
+function remove() {
+  declare -A args=(
+    ["name"]=""
+    ["serial"]=""
+  )
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name|-n)
+        args["name"]="$2"
+        shift 2
+        ;;
+      --serial|-s)
+        args["serial"]="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+  if [ -f {{ piaas_config_root }}/nodes/${args["serial"]} ]; then
+    rm {{ piaas_config_root }}/nodes/${args["serial"]}
+  else
+    echo "node with serial ${args["serial"]} does not exist"
+  fi
+}
+
+function assign() {
+  declare -A args=(
+    ["instance_name"]=""
+    ["node_serial"]=""
+  )
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --instance_name|-n)
+        args["name"]="$2"
+        shift 2
+        ;;
+      --node_serial|-s)
+        args["serial"]="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+  boot_dir=$(find -L {{ piaas_tftp_root }}/ -samefile {{ piaas_nfs_root }}/${args["name"]}/boot/firmware/)
+  if [ -z "$boot_dir" ]; then
+    ln -s {{ piaas_nfs_root }}/${args["name"]}/boot/firmware {{ piaas_tftp_root }}/${args["serial"]}
+  fi
+}
+
+function unassign() {
+  declare -A args=(
+    ["node_serial"]=""
+  )
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --node_serial|-s)
+        args["serial"]="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  rm {{ piaas_tftp_root }}/${args["serial"]}
+}
+
+function get_assigned() {
+  declare -A args=(
+    ["name"]=""
+  )
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name|-n)
+        args["serial"]="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  basename $(find -L /data/tftpboot/ -samefile /data/nfs/${args["name"]}/boot/firmware)
+}
+
+if [[ "$1" != "_"* ]]; then
+  "$@"
+else
+  echo "Unknown subcommand: $1"
+fi
+
