@@ -1,0 +1,11 @@
+[Unit]
+Description=Mount all filesystems from custom fstab
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/mount -a -T {{ piaas_config_root }}/fstab
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -9,11 +9,19 @@
     include_role:
       name: "einfachit.piaas.netboot_server"
 
-  - name: Setup netboot server
+  - name: Setup piaas service
+    include_role:
+      name: "einfachit.piaas.webui"
+
+
+- name: Configure wifi bridge
+  hosts: wifi_bridge
+  become: true
+  gather_facts: true
+  tasks:
+
+  - name: Setup wifi bridge
     include_role:
       name: "einfachit.piaas.wifi_bridge"
 
 
-  - name: Setup piaas service
-    include_role:
-      name: "einfachit.piaas.webui"

@@ -11,3 +11,11 @@
     name: traefik
     state: started
     restart: yes
+
+- name: Start piaas mount service
+  ansible.builtin.service:
+    name: piaas-fstab 
+    state: started
+    enabled: true
+
+

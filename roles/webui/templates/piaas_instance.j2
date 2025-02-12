@@ -32,9 +32,9 @@ function create() {
     #rsync -a {{ piaas_images_root }}/${args["image"]}/ {{ piaas_nfs_root }}/${args["name"]}
     mkdir {{ piaas_nfs_root }}/upper/${args["name"]}
     mkdir {{ piaas_nfs_root }}/work/${args["name"]}
-    lineinfile "{{ piaas_nfs_root }}/${args['name']} " "overlay  {{ piaas_nfs_root }}/${args['name']} overlay noauto,x-systemd.automount,nfs_export=on,index=on,lowerdir={{ piaas_images_root }}/${args['image']},upperdir={{ piaas_nfs_root }}/upper/${args['name']},workdir={{ piaas_nfs_root }}/work/${args['name']} 0 0" /etc/fstab
+    lineinfile "{{ piaas_nfs_root }}/${args['name']} " "overlay  {{ piaas_nfs_root }}/${args['name']} overlay auto,x-systemd.automount,nfs_export=on,index=on,lowerdir={{ piaas_images_root }}/${args['image']},upperdir={{ piaas_nfs_root }}/upper/${args['name']},workdir={{ piaas_nfs_root }}/work/${args['name']} 0 0" {{ piaas_config_root }}/fstab
     systemctl daemon-reload
-    sudo mount {{ piaas_nfs_root }}/${args["name"]}
+    sudo mount -T {{ piaas_config_root }}/fstab {{ piaas_nfs_root }}/${args["name"]}
 
     echo > {{ piaas_nfs_root }}/${args["name"]}/etc/fstab
     echo "proc /proc proc defaults 0 0" >> {{ piaas_nfs_root }}/${args["name"]}/etc/fstab
@@ -82,7 +82,7 @@ function delete(){
     sed -i "\|{{ piaas_nfs_root }}/${args['name']}[ \t]|d" /etc/exports
     service nfs-kernel-server restart
     umount  {{ piaas_nfs_root }}/${args["name"]}
-    sed -i "\|{{ piaas_nfs_root }}/${args['name']} |d" /etc/fstab
+    sed -i "\|{{ piaas_nfs_root }}/${args['name']} |d" {{ piaas_config_root }}/fstab
     systemctl daemon-reload
     rm -rf {{ piaas_nfs_root }}/${args["name"]}
     rm -rf {{ piaas_nfs_root }}/upper/${args["name"]}

@@ -82,17 +82,17 @@ if [ ! -z "$QUERY_STRING" ]; then
   ACTION=`echo "$QUERY_STRING" | sed -n 's/^.*action=\([^&]*\).*$/\1/p' | sed "s/%20/ /g"`
   case $ACTION in
     shelv)
-    source /etc/piaas/nodes/$SERIAL
+    source {{ piaas_config_root }}/nodes/$SERIAL
     $PWR_OFF_CMD 1>/dev/null 
     sudo piaas_instance unassign_node -s $SERIAL
     ;;
     unshelv)
-    source /etc/piaas/nodes/$SERIAL
+    source {{ piaas_config_root }}/nodes/$SERIAL
     sudo piaas_instance assign_node -n $INSTANCE -s $SERIAL
     $PWR_ON_CMD 1>/dev/null
     ;;
     reset)
-    source /etc/piaas/nodes/$SERIAL
+    source {{ piaas_config_root }}/nodes/$SERIAL
     echo factory reset instance $INSTANCE
     echo '<br>'
     sudo piaas_instance delete --name $INSTANCE
@@ -101,7 +101,7 @@ if [ ! -z "$QUERY_STRING" ]; then
     pwr_on)
     echo poweron instance running on raspberry pi with serial number $SERIAL
     echo '<br>'
-    source /etc/piaas/nodes/$SERIAL
+    source {{ piaas_config_root }}/nodes/$SERIAL
     echo '<br>'
     echo running: $PWR_ON_CMD
     echo '<br>'
@@ -110,7 +110,7 @@ if [ ! -z "$QUERY_STRING" ]; then
     pwr_off)
     echo poweroff instance running on raspberry pi with serial number $SERIAL
     echo '<br>'
-    source /etc/piaas/nodes/$SERIAL
+    source {{ piaas_config_root }}/nodes/$SERIAL
     echo '<br>'
     echo running: $PWR_OFF_CMD
     echo '<br>'
@@ -119,7 +119,7 @@ if [ ! -z "$QUERY_STRING" ]; then
     pwr_state)
     echo get power state of instance running on raspberry pi with serial number $SERIAL INTEGER: 1 = on INTEGER: 2 = off
     echo '<br>'
-    source /etc/piaas/nodes/$SERIAL
+    source {{ piaas_config_root }}/nodes/$SERIAL
     echo '<br>'
     echo running: $PWR_GET_CMD
     echo '<br>'
@@ -138,10 +138,10 @@ if [ ! -z "$QUERY_STRING" ]; then
     sudo piaas_instance unassign_node -s $SERIAL
     ;;
     assignment)
-    basename $(find -L /data/tftpboot/ -samefile /data/nfs/${INSTANCE}/boot/firmware)
+    basename $(find -L {{ piaas_tftp_root }}/ -samefile {{ piaas_nfs_root }}/${INSTANCE}/boot/firmware)
     ;;
     unassigned)
-    diff <(ls /data/tftpboot/) <(ls /etc/piaas/nodes/) | grep -e '^>' | cut -d " " -f2
+    diff <(ls {{ piaas_tftp_root }}/) <(ls {{ piaas_config_root }}/nodes/) | grep -e '^>' | cut -d " " -f2
     ;;
   esac
 fi
@@ -163,7 +163,7 @@ echo '<body>'
 echo '<header> <h2>PIaaS Web UI</h2> </header>'
 echo '<h1>Instances</h1>'
  echo '<table> <tr> <th>Name</th> <th>Image</th> <th>Serial</th> <th>Power</th> <th>Ping</th> <th>SSH</th> <th>VNC</th> <th>Action</th> <th></th> </tr>'
-  for instance in $(ls /data/nfs/ | grep -v -e 'upper\|work\|.*bak');
+  for instance in $(ls {{ piaas_nfs_root }}/ | grep -v -e 'upper\|work\|.*bak');
   do echo '<tr>'
     echo '<form action="">'
     echo '<td>'
@@ -171,16 +171,16 @@ echo '<h1>Instances</h1>'
     echo "$instance"
     echo '</td>'
     echo '<td>'
-      image=$(grep " /data/nfs/$instance " /etc/fstab | grep -oP "(?:^|,)lowerdir=\K[^,]+" | xargs basename)
+      image=$(grep " {{ piaas_nfs_root }}/$instance " {{ piaas_config_root }}/fstab | grep -oP "(?:^|,)lowerdir=\K[^,]+" | xargs basename)
       echo "$image"
       echo "<input type="hidden" id="imageName" name="image" value="$image">"
     echo '</td>'
-    boot_dir=$(find -L /data/tftpboot/ -samefile /data/nfs/${instance}/boot/firmware)
+    boot_dir=$(find -L {{ piaas_tftp_root }}/ -samefile {{ piaas_nfs_root }}/${instance}/boot/firmware)
     if [ ! -z "$boot_dir" ]
     then
       echo '<td>'
       serial=$(basename $boot_dir)
-      source /etc/piaas/nodes/$serial
+      source {{ piaas_config_root }}/nodes/$serial
       echo '<div class="tooltip">'
       echo "<input type="hidden" id="nodeSerial" name="serial" value="$serial">"
       echo $NODEINFO
@@ -198,10 +198,10 @@ echo '<h1>Instances</h1>'
     else
       echo '<td>'
       echo '<select id="serial" name="serial">'
-      nodes=$(diff <(ls /data/tftpboot/) <(ls /etc/piaas/nodes/) | grep -e '^>' | cut -d " " -f2)
+      nodes=$(diff <(ls {{ piaas_tftp_root }}/) <(ls {{ piaas_config_root }}/nodes/) | grep -e '^>' | cut -d " " -f2)
       for node in $nodes;
       do
-        source /etc/piaas/nodes/$node
+        source {{ piaas_config_root }}/nodes/$node
         echo "<option title="$node" value="$node">$NODEINFO</option>"
       done
       echo '</select>'
@@ -248,7 +248,7 @@ echo '<h1>Instances</h1>'
      echo '</td>'
      echo '<td>'
      echo '<select style="width: 250px;" id="image" name="image">'
-       images=$(ls /data/images)
+       images=$(ls {{ piaas_images_root }})
        for image in $images;
        do
          echo "<option value="$image">$image</option>"
@@ -257,10 +257,10 @@ echo '<h1>Instances</h1>'
      echo '</td>'
      echo '<td>'
        #echo '<select id="serial" name="serial">'
-       #nodes=$(diff <(ls /data/tftpboot/) <(ls /etc/piaas/nodes/) | grep -e '^>' | cut -d " " -f2)
+       #nodes=$(diff <(ls {{ piaas_tftp_root }}/) <(ls {{ piaas_config_root }}/nodes/) | grep -e '^>' | cut -d " " -f2)
        #for node in $nodes;
        #do
-       #  source /etc/piaas/nodes/$node
+       #  source {{ piaas_config_root }}/nodes/$node
        #  echo "<option title="$node" value="$node">$NODEINFO</option>"
        #done
      echo '</td>'

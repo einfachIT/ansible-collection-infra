@@ -37,6 +37,16 @@
     - piaas_image
     - piaas_instance
 
+- name: Install piaas custom mount service
+  ansible.builtin.template:
+    src: "piaas-fstab.service.j2"
+    dest: "/etc/systemd/system/piaas-fstab.service"
+    owner: root
+    group: root
+    mode: '0744'
+  notify:
+    Start piaas mount service
+ 
 - name: copy traeffic configuration
   ansible.builtin.template:
     src: traefik.j2
@@ -44,6 +54,7 @@
     owner: root
     group: root
     mode: '0644'
+    force: true
   notify:
     - Restart traefik
 
@@ -55,14 +66,14 @@
   community.general.docker_container:
     name: "traefik"
     image: "traefik:v2.10"
-    restart_policy: unless-stopped
+    restart_policy: no
     published_ports:
       - "80:80"
       - "443:443"
     volumes:
       - "/home/{{ piaas_user }}/traefik.yml:/etc/traefik/traefik.yml"
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - traefik_certs:/certs
+      - "traefik_certs:/certs"
 
 - name: Create guacamole config docker volume
   community.docker.docker_volume:
@@ -87,18 +98,19 @@
       traefik.http.services.guacamoleService.loadBalancer.server.port: "8080"
 
 - name: copy web-ui prototype script
-  ansible.builtin.copy:
+  ansible.builtin.template:
     src: "{{ item.src}}" 
     dest: "{{ item.dest }}"
     mode: "{{ item.mode }}"
     owner: epic
     group: epic
+    force: true
   loop:
    - src: index.html
      dest: /var/www/html/
      mode: '0644'
-   - src: piaas.cgi
-     dest: /var/www/html/cgi-bin/
+   - src: piaas.cgi.j2
+     dest: /var/www/html/cgi-bin/piaas.cgi
      mode: '0755'
 
 #- name: Create uptime-kuma docker volume

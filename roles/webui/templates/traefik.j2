@@ -58,7 +58,7 @@ http:
       middlewares:
         - auth
     dashboard:
-      rule: Host(`{{ piaas_external_fqdn }}`) && (PathPrefix(`/api/`) || PathPrefix(`/dashboard/`))
+      rule: Host(`{{ piaas_internal_fqdn }}`) && (PathPrefix(`/api/`) || PathPrefix(`/dashboard/`))
       service: api@internal
       entrypoints: "websecure"
       tls:
