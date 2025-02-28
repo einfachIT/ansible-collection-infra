@@ -5,9 +5,10 @@
   gather_facts: true
   tasks:
 
-  - name: Setup netboot server
+  - name: Setup piaas service
     include_role:
       name: "einfachit.piaas.netboot_server"
+
 
   - name: Setup piaas service
     include_role:

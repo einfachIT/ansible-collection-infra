@@ -17,11 +17,11 @@
     state: directory
     mode: '0755'
   loop:
-    - "{{ netboot_server_nfs_root }}"
-    - "{{ netboot_server_nfs_root }}/upper"
-    - "{{ netboot_server_nfs_root }}/work"
-    - "{{ netboot_server_tftp_root }}"
-    - "{{ netboot_server_images_root }}"
+    - "{{ piaas_nfs_root }}"
+    - "{{ piaas_nfs_root }}/upper"
+    - "{{ piaas_nfs_root }}/work"
+    - "{{ piaas_tftp_root }}"
+    - "{{ piaas_images_root }}"
 
 
 - name: Flush handlers
@@ -40,7 +40,7 @@
     - regexp: "^enable-tftp"
       line: "enable-tftp"
     - regexp: "^tftp-root="
-      line: "tftp-root={{ netboot_server_tftp_root }}"
+      line: "tftp-root={{ piaas_tftp_root }}"
     - regexp: "^pxe-service="
       line: 'pxe-service=0,"Raspberry Pi Boot"'
   notify:
@@ -51,8 +51,8 @@
     dest: /etc/exports
     line: "{{ item }}"
   loop:
-    - "{{ netboot_server_data_dir }} *(rw,sync,no_root_squash,crossmnt)"
-    - "{{ netboot_server_nfs_root }} *(rw,sync,no_root_squash,crossmnt)"
+    - "{{ piaas_data_dir }} *(rw,sync,no_root_squash,crossmnt)"
+    - "{{ piaas_nfs_root }} *(rw,sync,no_root_squash,crossmnt)"
   notify:
     - Restart rpcbind
     - Restart nfs server
@@ -60,10 +60,11 @@
 - name: Copy default custom.toml
   ansible.builtin.copy:
     src: "custom.toml"
-    dest: "{{ netboot_server_config_root }}"
+    dest: "{{ piaas_config_root }}/"
+    mode: 0644
 
 - name: copy vnc script
   ansible.builtin.copy:
     src: "enable_vnc_access.sh"
-    dest: "{{ netboot_server_config_root }}"
+    dest: "{{ piaas_config_root }}/"
     mode: 0744

@@ -25,6 +25,15 @@
   notify:
     - Restart mini-httpd
 
+- name: Create initial empty piaas fstab
+  ansible.builtin.copy:
+    dest: "{{ piaas_config_root }}/fstab"
+    owner: root
+    group: root
+    force: false
+    content: '# mount configuration for the piaas'
+  loop:
+    -  fstab
 
 - name: Copy cli scripts
   ansible.builtin.template:
