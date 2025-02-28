@@ -34,7 +34,7 @@
     line: "{{ item.line }}"
   loop:
     - regexp: "^dhcp-range="
-      line: "dhcp-range={{ netboot_server_dhcp_range }}"
+      line: "dhcp-range={{ piaas_dhcp_range }}"
     - regexp: "^log-dhcp"
       line: "log-dhcp"
     - regexp: "^enable-tftp"
