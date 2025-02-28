@@ -106,6 +106,12 @@
       traefik.http.routers.guacamole.service: "guacamoleService"
       traefik.http.services.guacamoleService.loadBalancer.server.port: "8080"
 
+- name: Create cgi-bin directory
+  ansible.builtin.file:
+    path: "/var/www/html/cgi-bin"
+    state: directory
+    mode: '0755'
+
 - name: copy web-ui prototype script
   ansible.builtin.template:
     src: "{{ item.src}}" 
