@@ -52,7 +52,7 @@
     dest: "/etc/systemd/system/piaas-fstab.service"
     owner: root
     group: root
-    mode: '0744'
+    mode: '0644'
   notify:
     Start piaas mount service
  
