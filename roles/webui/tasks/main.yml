@@ -9,6 +9,7 @@
     - rsync
     - mini-httpd
     - snmp
+    - nmap
 
 - name: configure mini-httpd
   ansible.builtin.lineinfile:
@@ -31,9 +32,8 @@
     owner: root
     group: root
     force: false
+    mode: "0644"
     content: '# mount configuration for the piaas'
-  loop:
-    -  fstab
 
 - name: Copy cli scripts
   ansible.builtin.template:
@@ -75,7 +75,7 @@
   community.general.docker_container:
     name: "traefik"
     image: "traefik:v2.10"
-    restart_policy: no
+    restart_policy: "unless-stopped"
     published_ports:
       - "80:80"
       - "443:443"
@@ -127,6 +127,18 @@
    - src: piaas.cgi.j2
      dest: /var/www/html/cgi-bin/piaas.cgi
      mode: '0755'
+
+- name: copy node info files
+  ansible.builtin.template:
+    src: "nodes.j2"
+    dest: "{{ piaas_config_root }}/nodes/{{ node.webui_serial }}"
+  loop: "{{ piaas_nodes }}"
+  loop_control:
+    loop_var: node
+  when:
+    - piaas_nodes is defined
+    - piaas_nodes | length > 0
+
 
 #- name: Create uptime-kuma docker volume
 #  community.docker.docker_volume:

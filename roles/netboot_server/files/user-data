@@ -1,0 +1,25 @@
+#cloud-config
+hostname: ${HOSTNAME}
+manage_etc_hosts: true
+packages:
+- avahi-daemon
+apt:
+  conf: |
+    Acquire {
+      Check-Date "false";
+    };
+timezone: Europe/Zurich
+keyboard:
+  model: pc105
+  layout: "de"
+enable_ssh: true
+users:
+- name: epic
+  groups: users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
+  shell: /bin/bash
+  lock_passwd: false
+  passwd: $y$jB5$op2NmFKRr.5OnpKIjx2CI/$48efGCbEpAYB.nmgoDq0lcWAY5kwB38AJRcVCvJVpDC
+ssh_pwauth: true
+rpi:
+  interfaces:
+    serial: true

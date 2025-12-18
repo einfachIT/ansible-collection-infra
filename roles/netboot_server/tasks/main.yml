@@ -11,7 +11,7 @@
     - tcpdump
     - nfs-kernel-server
 
-- name: Create nfs and tftp boot directories
+- name: Create piaas directories
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
@@ -22,6 +22,8 @@
     - "{{ piaas_nfs_root }}/work"
     - "{{ piaas_tftp_root }}"
     - "{{ piaas_images_root }}"
+    - "{{ piaas_config_root }}"
+    - "{{ piaas_config_root }}/nodes"
 
 
 - name: Flush handlers
@@ -46,22 +48,56 @@
   notify:
     - Setup dnsmasq service
 
-- name: Configure nfs exports
+- name: Configure nfs root exports
   ansible.builtin.lineinfile:
     dest: /etc/exports
     line: "{{ item }}"
   loop:
-    - "{{ piaas_data_dir }} *(rw,sync,no_root_squash,crossmnt)"
-    - "{{ piaas_nfs_root }} *(rw,sync,no_root_squash,crossmnt)"
+    - "{{ piaas_nfs_root }} *(rw,sync,no_root_squash,crossmnt,no_subtree_check)"
   notify:
-    - Restart rpcbind
-    - Restart nfs server
+   - Restart rpcbind
+   - Restart nfs server
 
-- name: Copy default custom.toml
+
+- name: Ensure /etc/exports.d exists
+  ansible.builtin.file:
+    path: /etc/exports.d
+    state: directory
+    mode: '0755'
+
+- name: Ensure source exports file exists (optional safeguard)
+  ansible.builtin.file:
+    path: /data/config/piaas.exports
+    state: touch
+    access_time: preserve
+    modification_time: preserve
+    mode: '0644'
+
+- name: Create symlink in /etc/exports.d
+  ansible.builtin.file:
+    src: /data/config/piaas.exports
+    dest: /etc/exports.d/piaas.exports
+    state: link
+  notify:
+   - Restart rpcbind
+   - Restart nfs server
+
+- name: Copy bootcode.bin
   ansible.builtin.copy:
-    src: "custom.toml"
+    src: "/boot/firmware/bootcode.bin"
+    dest: "{{ piaas_tftp_root }}/"
+    remote_src: true
+
+- name: Copy clout-init config files
+  ansible.builtin.copy:
+    src: "{{ item }}"
     dest: "{{ piaas_config_root }}/"
     mode: 0644
+  loop:
+    - custom.toml
+    - meta-data
+    - user-data
+    - network-config
 
 - name: copy vnc script
   ansible.builtin.copy:

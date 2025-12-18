@@ -1,171 +1,302 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
+set -Eeuo pipefail
+IFS=$'\n\t'
 
-function lineinfile() { line=${2//\//\\/} ; sed -i -e '/'"${1//\//\\/}"'/{s/.*/'"${line}"'/;:a;n;ba;q};$a'"${line}" "$3" ; }
+#-------------------------
+# Config (override via env)
+#-------------------------
+NFS_ROOT="{{ piaas_nfs_root }}"
+IMAGES_ROOT="{{ piaas_images_root }}"
+FSTAB_FILE="{{ piaas_config_root }}/fstab"
+EXPORTS_FILE=$"{{ piaas_config_root }}/piaas.exports"
+TFTP_ROOT="{{ piaas_tftp_root }}"
+SERVER_IP="{{ piaas_ip_address }}"
+LOG_LEVEL=${LOG_LEVEL:-INFO}
+LOCK_FILE=${LOCK_FILE:-/var/lock/nfs-instance-manager.lock}
 
-function create() {
-  declare -A args=(
-    ["name"]=""
-    ["image"]=""
-  )
+# Overlay options (ensure your kernel supports these if enabled)
+OVERLAY_EXTRA_OPTS=${OVERLAY_EXTRA_OPTS:-"index=on,nfs_export=on"} # can be empty
 
+#-------------------------
+# Logging
+#-------------------------
+log() { printf '%s [%s] %s\n' "$(date -Is)" "${1}" "${2}" >&2; }
+debug() { [[ "${LOG_LEVEL}" == "DEBUG" ]] && log "DEBUG" "$1" || true; }
+info()  { log "INFO" "$1"; }
+warn()  { log "WARN" "$1"; }
+error() { log "ERROR" "$1"; }
+
+#-------------------------
+# Helpers
+#-------------------------
+require_root() { [[ "${EUID}" -eq 0 ]] || { error "Run as root"; exit 1; }; }
+sanitize_name() {
+  local name="$1"
+  if [[ -z "${name}" || ! "${name}" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+    error "Invalid name: '${name}'. Allowed: [a-zA-Z0-9._-]+"
+    exit 2
+  fi
+}
+
+
+line_replace_or_append() {
+  local match_regex="$1"  # provide a proper regex
+  local newline="$2"
+  local file="$3"
+
+  # Escape slashes for sed's /.../ delimiters
+  local esc_regex="${match_regex//\//\\/}"
+  local esc_line="${newline//\//\\/}"
+
+  # If a matching line exists: replace first occurrence; otherwise append at EOF.
+  # Explanation:
+  #  - /REGEX/{s/.*/LINE/;b}   -> on first match, replace and branch (skip to end)
+  #  - $aLINE                  -> if no match happened, append at end
+  sed -i -e "/${esc_regex}/{s/.*/${esc_line}/;b};\$a${newline}" "${file}"
+}
+
+# Delete all lines matching regex (use '|' delimiter to avoid escaping '/')
+line_delete() {
+  local match_regex="$1"
+  local file="$2"
+  sed -i "\|${match_regex}|d" "${file}"
+}
+
+
+mount_if_needed() {
+  local mountpoint="$1" source_type="$2" options="$3"
+  if mountpoint -q -- "${mountpoint}"; then
+    info "Already mounted: ${mountpoint}"
+    return 0
+  fi
+  info "Mounting ${mountpoint}"
+  mount -t "${source_type}" -o "${options}" "${source_type}" "${mountpoint}"
+}
+
+umount_if_mounted() {
+  local mountpoint="$1"
+  if mountpoint -q -- "${mountpoint}"; then
+    info "Unmounting ${mountpoint}"
+    umount "${mountpoint}" || { warn "Busy, lazy unmount ${mountpoint}"; umount -l "${mountpoint}"; }
+  fi
+}
+
+#-------------------------
+# Subcommands
+#-------------------------
+create() {
+  local name="" image=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --name|-n)
-        args["name"]="$2"
-        shift 2
-        ;;
-      --image|-i)
-        args["image"]="$2"
-        shift 2
-        ;;
-      *)
-        echo "Unknown option: $1"
-        exit 1
-        ;;
+      --name|-n)   name="$2"; shift 2 ;;
+      --image|-i)  image="$2"; shift 2 ;;
+      *) error "Unknown option: $1"; exit 1 ;;
     esac
   done
 
-  if [ ! -d {{ piaas_nfs_root }}/${args["name"]} ]; then
-    mkdir {{ piaas_nfs_root }}/${args["name"]}
-    #rsync -a {{ piaas_images_root }}/${args["image"]}/ {{ piaas_nfs_root }}/${args["name"]}
-    mkdir {{ piaas_nfs_root }}/upper/${args["name"]}
-    mkdir {{ piaas_nfs_root }}/work/${args["name"]}
-    lineinfile "{{ piaas_nfs_root }}/${args['name']} " "overlay  {{ piaas_nfs_root }}/${args['name']} overlay auto,x-systemd.automount,nfs_export=on,index=on,lowerdir={{ piaas_images_root }}/${args['image']},upperdir={{ piaas_nfs_root }}/upper/${args['name']},workdir={{ piaas_nfs_root }}/work/${args['name']} 0 0" {{ piaas_config_root }}/fstab
-    systemctl daemon-reload
-    sudo mount -T {{ piaas_config_root }}/fstab {{ piaas_nfs_root }}/${args["name"]}
+  require_root
+  sanitize_name "${name}"
+  sanitize_name "${image}"
 
-    echo > {{ piaas_nfs_root }}/${args["name"]}/etc/fstab
-    echo "proc /proc proc defaults 0 0" >> {{ piaas_nfs_root }}/${args["name"]}/etc/fstab
-    echo "{{ piaas_ip_address }}:{{ piaas_nfs_root }}/${args["name"]}/boot/firmware /boot/firmware nfs defaults,vers=4.1,proto=tcp 0 0" >>  {{ piaas_nfs_root }}/${args["name"]}/etc/fstab
+  local inst_dir="${NFS_ROOT}/${name}"
+  local upper_dir="${NFS_ROOT}/upper/${name}"
+  local work_dir="${NFS_ROOT}/work/${name}"
+  local lower_dir="${IMAGES_ROOT}/${image}"
 
-    echo "console=serial0,115200 console=tty1 root=/dev/nfs nfsroot={{ piaas_ip_address }}:{{ piaas_nfs_root }}/${args["name"]},vers=3 rw ip=dhcp rootwait quite init=/usr/lib/raspberrypi-sys-mods/firstboot" >  {{ piaas_nfs_root }}/${args["name"]}/boot/firmware/cmdline.txt
-    rm  {{ piaas_nfs_root }}/${args["name"]}/etc/init.d/resize2fs_once
-    sed "s/hostname =.*/hostname = \"${args["name"]}\"/g"  {{ piaas_config_root }}/custom.toml >  {{ piaas_nfs_root }}/${args["name"]}/boot/firmware/custom.toml
+  [[ -d "${lower_dir}" ]] || { error "Image not found: ${lower_dir}"; exit 3; }
 
-    # add instance to be exported via nfs
-    lineinfile "{{ piaas_nfs_root }}/${args['name']} " "{{ piaas_nfs_root }}/${args['name']} *(rw,sync,no_root_squash)" /etc/exports
-    service  nfs-kernel-server restart
+  mkdir -p "${inst_dir}" "${upper_dir}" "${work_dir}"
 
-    # copy enable vnc script
-    cp {{ piaas_config_root }}/enable_vnc_access.sh {{ piaas_nfs_root }}/${args['name']}/usr/sbin/
+  # Add overlay mount to custom fstab (atomic)
+  local overlay_opts="x-systemd.automount,lowerdir=${lower_dir},upperdir=${upper_dir},workdir=${work_dir}"
+  [[ -n "${OVERLAY_EXTRA_OPTS}" ]] && overlay_opts="${overlay_opts},${OVERLAY_EXTRA_OPTS}"
+  local fstab_line="overlay ${inst_dir} overlay auto,${overlay_opts} 0 0"
+  line_replace_or_append "^[[:space:]]*overlay[[:space:]]+${inst_dir}[[:space:]]" "${fstab_line}" "${FSTAB_FILE}"
 
+  systemctl daemon-reload
+  # Use -T to point mount to custom fstab file
+  mount -T "${FSTAB_FILE}" "${inst_dir}"
+
+  # Prepare guest fstab
+  : > "${inst_dir}/etc/fstab"
+  printf 'proc /proc proc defaults 0 0\n' >> "${inst_dir}/etc/fstab"
+  printf '%s:%s/boot/firmware /boot/firmware nfs defaults,proto=tcp 0 0\n' "${SERVER_IP}" "${inst_dir}" >> "${inst_dir}/etc/fstab"
+
+  # Raspberry Pi cmdline
+  # NOTE: corrected "quite" -> "quiet"; choose a single NFS version (here 3, vers 4 does not work for pxe booting raspberry pi)
+  printf 'console=serial0,115200 console=tty1 root=/dev/nfs nfsroot=%s:%s,vers=3 rw ip=dhcp systemd.mask=systemd-growfs-root.service rootwait \n' \
+    "${SERVER_IP}" "${inst_dir}" > "${inst_dir}/boot/firmware/cmdline.txt"
+
+  # Optional cleanup; ignore if missing
+  rm -f "${inst_dir}/etc/init.d/resize2fs_once"
+
+  # Disable BT and WIFI
+  echo 'dtoverlay=disable-bt' >> ${inst_dir}/boot/firmware/config.txt
+  echo 'dtoverlay=disable-wifi' >> ${inst_dir}/boot/firmware/config.txt
+
+  # Instance-specific boot config
+  # sed "s/hostname =.*/hostname = \"${name}\"/g" /data/config/custom.toml > "${inst_dir}/boot/firmware/custom.toml"
+  export HOSTNAME=${name}
+  envsubst '${HOSTNAME}' < /data/config/user-data > ${inst_dir}/boot/firmware/user-data
+  cp /data/config/meta-data  ${inst_dir}/boot/firmware/meta-data
+  cp /data/config/network-config  ${inst_dir}/boot/firmware/network-config
+
+  # NFS exports (atomic)
+  line_replace_or_append "^[[:space:]]*${inst_dir}[[:space:]]" \
+    "${inst_dir} *(rw,sync,no_root_squash,no_subtree_check)" \
+    "${EXPORTS_FILE}"
+
+  # Apply NFS export changes
+  exportfs -ra
+
+  # Copy helper
+  install -m 0755 /data/config/enable_vnc_access.sh "${inst_dir}/usr/sbin/"
+
+  info "Instance '${name}' created from image '${image}' at ${inst_dir}"
+}
+
+delete() {
+  local name=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name|-n) name="$2"; shift 2 ;;
+      *) error "Unknown option: $1"; exit 1 ;;
+    esac
+  done
+
+  require_root
+  sanitize_name "${name}"
+
+  local inst_dir="${NFS_ROOT}/${name}"
+  local upper_dir="${NFS_ROOT}/upper/${name}"
+  local work_dir="${NFS_ROOT}/work/${name}"
+
+  if [[ ! -d "${inst_dir}" ]]; then
+    warn "Instance '${name}' does not exist"
+    return 0
+  fi
+
+  umount_if_mounted "${inst_dir}"
+
+
+  # Remove overlay line from fstab (in-place sed with -E)
+  sed -i -E "/^[[:space:]]*overlay[[:space:]]+${inst_dir//\//\\/}[[:space:]]+overlay[[:space:]]+/d" "${FSTAB_FILE}"
+
+  systemctl daemon-reload
+  exportfs -ra
+
+  rm -rf --one-file-system "${inst_dir}" "${upper_dir}" "${work_dir}"
+
+  info "Instance '${name}' deleted"
+}
+
+assign_node() {
+  local instance_name="" node_serial=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --instance_name|-n) instance_name="$2"; shift 2 ;;
+      --node_serial|-s)   node_serial="$2"; shift 2 ;;
+      *) error "Unknown option: $1"; exit 1 ;;
+    esac
+  done
+
+  require_root
+  sanitize_name "${instance_name}"
+  sanitize_name "${node_serial}"
+
+  local inst_dir="${NFS_ROOT}/${instance_name}"
+  [[ -d "${inst_dir}" ]] || { error "Instance not found: ${instance_name}"; exit 4; }
+
+  local firmware_dir="${inst_dir}/boot/firmware"
+  mkdir -p "${TFTP_ROOT}"
+  local link="${TFTP_ROOT}/${node_serial}"
+
+  # If already linked, do nothing
+  local found
+  found="$(find -L "${TFTP_ROOT}/" -maxdepth 1 -samefile "${firmware_dir}" || true)"
+  if [[ -z "${found}" ]]; then
+    ln -sfn "${firmware_dir}" "${link}"
+    info "Assigned node '${node_serial}' -> '${instance_name}'"
   else
-    echo instance with name ${args["name"]} already exists
+    info "Node '${node_serial}' already assigned (or matching link exists)"
   fi
-
 }
 
-
-function delete(){
-  declare -A args=(
-    ["name"]=""
-  )
-
+unassign_node() {
+  local node_serial=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --name|-n)
-        args["name"]="$2"
-        shift 2
-        ;;
-      *)
-        echo "Unknown option: $1"
-        exit 1
-        ;;
+      --node_serial|-s) node_serial="$2"; shift 2 ;;
+      *) error "Unknown option: $1"; exit 1 ;;
     esac
   done
 
-  # add check if instance is linked/running
-  # for file in $(find /data/tftpboot/ -type l); do  readlink  "$file"; done
-  if [ -d {{ piaas_nfs_root }}/${args["name"]} ]; then
-    sed -i "\|{{ piaas_nfs_root }}/${args['name']}[ \t]|d" /etc/exports
-    service nfs-kernel-server restart
-    umount  {{ piaas_nfs_root }}/${args["name"]}
-    sed -i "\|{{ piaas_nfs_root }}/${args['name']} |d" {{ piaas_config_root }}/fstab
-    systemctl daemon-reload
-    rm -rf {{ piaas_nfs_root }}/${args["name"]}
-    rm -rf {{ piaas_nfs_root }}/upper/${args["name"]}
-    rm -rf {{ piaas_nfs_root }}/work/${args["name"]}
+  require_root
+  sanitize_name "${node_serial}"
+
+  local link="${TFTP_ROOT}/${node_serial}"
+  if [[ -L "${link}" || -e "${link}" ]]; then
+    rm -f -- "${link}"
+    info "Unassigned node '${node_serial}'"
   else
-    echo instance with name ${args["name"]} does not exists
+    warn "No assignment found for '${node_serial}'"
   fi
 }
 
-function assign_node() {
-  declare -A args=(
-    ["instance_name"]=""
-    ["node_serial"]=""
-  )
-
+get_assigned_node() {
+  local name=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --instance_name|-n)
-        args["name"]="$2"
-        shift 2
-        ;;
-      --node_serial|-s)
-        args["serial"]="$2"
-        shift 2
-        ;;
-      *)
-        echo "Unknown option: $1"
-        exit 1
-        ;;
-    esac
-  done
-  boot_dir=$(find -L {{ piaas_tftp_root }}/ -samefile {{ piaas_nfs_root }}/${args["name"]}/boot/firmware/)
-  if [ -z "$boot_dir" ]; then
-    ln -s {{ piaas_nfs_root }}/${args["name"]}/boot/firmware {{ piaas_tftp_root }}/${args["serial"]}
-  fi
-}
-
-
-function unassign_node() {
-  declare -A args=(
-    ["node_serial"]=""
-  )
-
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --node_serial|-s)
-        args["serial"]="$2"
-        shift 2
-        ;;
-      *)
-        echo "Unknown option: $1"
-        exit 1
-        ;;
+      --name|-n) name="$2"; shift 2 ;;
+      *) error "Unknown option: $1"; exit 1 ;;
     esac
   done
 
-  rm {{ piaas_tftp_root }}/${args["serial"]}
+  sanitize_name "${name}"
+  local firmware_dir="${NFS_ROOT}/${name}/boot/firmware"
+  [[ -d "${firmware_dir}" ]] || { error "Instance not found: ${name}"; exit 4; }
+
+  # Print serial(s) linked to this instance
+  find -L "${TFTP_ROOT}/" -maxdepth 1 -samefile "${firmware_dir}" -printf '%f\n' || true
 }
 
-function get_assigned_node() {
-  declare -A args=(
-    ["name"]=""
-  )
+usage() {
+  cat <<EOF
+Usage: $0 <command> [options]
 
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --name|-n)
-        args["serial"]="$2"
-        shift 2
-        ;;
-      *)
-        echo "Unknown option: $1"
-        exit 1
-        ;;
-    esac
-  done
+Commands:
+  create        --name <name> --image <image>
+  delete        --name <name>
+  assign_node   --instance_name <name> --node_serial <serial>
+  unassign_node --node_serial <serial>
+  get_assigned_node --name <name>
 
-  basename $(find -L /data/tftpboot/ -samefile /data/nfs/${args["name"]}/boot/firmware)
+Examples:
+  $0 create -n rpi01 -i bookworm
+  $0 assign_node -n rpi01 -s E45F0123ABCD
+EOF
 }
 
-if [[ "$1" != "_"* ]]; then
-  "$@"
-else
-  echo "Unknown subcommand: $1"
-fi
+main() {
+  require_root
+  local cmd="${1:-}"; shift || true
+  # Serialize operations to avoid races
+  exec 9> "${LOCK_FILE}"
+  flock -x 9
+
+  case "${cmd}" in
+    create|delete|assign_node|unassign_node|get_assigned_node)
+      "${cmd}" "$@"
+      ;;
+    -h|--help|"")
+      usage ;;
+    *)
+      error "Unknown subcommand: ${cmd}"
+      usage
+      exit 1 ;;
+  esac
+}
+
+main "$@"
 
