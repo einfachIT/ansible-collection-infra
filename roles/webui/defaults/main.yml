@@ -1,7 +1,7 @@
 ---
 # defaults file for pia
 piaas_user: "{{ ansible_user }}"
-piaas_ip_address: "{{ ansible_default_ipv4.address }}"
+piaas_ip_address: "{{ ansible_facts['default_ipv4']['address'] }}"
 piaas_data_dir: "/data"
 piaas_tftp_root: "{{ piaas_data_dir }}/tftpboot"
 piaas_nfs_root: "{{ piaas_data_dir }}/nfs"
@@ -9,3 +9,18 @@ piaas_images_root: "{{ piaas_data_dir }}/images"
 piaas_config_root: "{{ piaas_data_dir }}/config"
 piaas_port: "9000"
 piaas_external_fqdn: "{{ ansible_host }}"
+
+
+# Redis and Data State
+webui_redis_enabled: true
+webui_redis_container_name: "webui_redis"
+webui_redis_image: "redis:7.4-alpine"
+webui_redis_port: 6379
+webui_redis_data_dir: "/data/config/webui-redis"
+
+# Traefik Route Manager (For managing the dynamic YAML files)
+webui_trm_enabled: true
+webui_trm_container_name: "webui_traefik_manager"
+webui_trm_image: "ghcr.io/jae-jae/traefik-route-manager:latest"
+webui_trm_port: 8089
+webui_trm_auth_token: "ChangeMeToSomethingSecure" # Required secret key token

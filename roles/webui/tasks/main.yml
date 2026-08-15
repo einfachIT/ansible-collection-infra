@@ -55,15 +55,53 @@
     mode: '0644'
   notify:
     Start piaas mount service
+
+- name: Create local data directory for Redis container persistence
+  ansible.builtin.file:
+    path: "{{ webui_redis_data_dir }}"
+    state: directory
+    mode: '0755'
+  when: webui_redis_enabled
+
+- name: Deploy Redis Docker Container
+  community.docker.docker_container:
+    name: "{{ webui_redis_container_name }}"
+    image: "{{ webui_redis_image }}"
+    state: started
+    restart_policy: always
+    # Bind only to 127.0.0.1 on the host to keep Redis traffic hidden from external networks
+    published_ports:
+      - "127.0.0.1:{{ webui_redis_port }}:6379"
+    volumes:
+      - "{{ webui_redis_data_dir }}:/data"
+    command: "redis-server --appendonly yes" # Enables persistent storage tracking
+  when: webui_redis_enabledA
+
+- name: Deploy Traefik Route Manager Container
+  community.docker.docker_container:
+    name: "{{ webui_trm_container_name }}"
+    image: "{{ webui_trm_image }}"
+    state: started
+    restart_policy: always
+    published_ports:
+      - "127.0.0.1:{{ webui_trm_port }}:8080" # Maps local host port to internal app port
+    env:
+      AUTH_TOKEN: "{{ webui_trm_auth_token }}" # Explicit security token requirement
+    volumes:
+      # Mounts the exact host dynamic folder into the container's watch zone
+      - "{{ webui_traefik_dynamic_dir }}:/app/config" 
+  when: webui_trm_enabled
  
 - name: copy traeffic configuration
   ansible.builtin.template:
-    src: traefik.j2
-    dest: "/home/{{ piaas_user }}/traefik.yml"
+    src: "{{ item }}.j2"
+    dest: "/home/{{ piaas_user }}/{{ item }}.yml"
     owner: root
     group: root
     mode: '0644'
     force: true
+  loop:
+   - traefik
   notify:
     - Restart traefik
 
@@ -74,13 +112,14 @@
 - name: Install traefik container
   community.general.docker_container:
     name: "traefik"
-    image: "traefik:v2.10"
+    image: "traefik:latest"
     restart_policy: "unless-stopped"
     published_ports:
       - "80:80"
       - "443:443"
     volumes:
       - "/home/{{ piaas_user }}/traefik.yml:/etc/traefik/traefik.yml"
+      - "/home/{{ piaas_user }}/dynamic.yml:/etc/traefik/dynamic.yml"
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "traefik_certs:/certs"
 

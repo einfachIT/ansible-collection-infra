@@ -131,6 +131,9 @@ if [ ! -z "$QUERY_STRING" ]; then
     create)
     sudo piaas_instance create --name $INSTANCE --image $IMAGE
     ;;
+    create_installer)
+    sudo piaas_instance create --name $INSTANCE --image $IMAGE --installer
+    ;;
     assign)
     sudo piaas_instance assign_node -n $INSTANCE -s $SERIAL
     ;;
